@@ -2,6 +2,7 @@
 
 import hashlib
 import hmac
+import io
 import json
 import os
 from pathlib import Path
@@ -11,7 +12,8 @@ import threading
 import time
 from types import SimpleNamespace
 import unittest
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
+from urllib.error import HTTPError
 from urllib.parse import parse_qs, urlencode, urlsplit
 from urllib.request import urlopen
 
@@ -19,6 +21,7 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 import jwt
 
 from src import auth
+from src import cli
 
 
 class LoginTests(unittest.TestCase):
@@ -120,6 +123,89 @@ class LoginTests(unittest.TestCase):
             with self.assertRaisesRegex(auth.LoginError, "権限"):
                 auth.login()
         self.assertFalse((self.directory / "credentials.json").exists())
+
+    def test_manual_method_prints_url_and_uses_same_callback(self) -> None:
+        jwk = SimpleNamespace(key=self.key.public_key())
+        jwks_client = SimpleNamespace(get_signing_key_from_jwt=lambda token: jwk)
+        output = io.StringIO()
+        opened = False
+
+        def show_url(*args: object, **kwargs: object) -> None:
+            nonlocal opened
+            output.write(" ".join(str(arg) for arg in args) + "\n")
+            if not opened:
+                for line in output.getvalue().splitlines():
+                    if line.startswith(auth.AUTHORIZE_URL):
+                        opened = True
+                        self._open_browser(line)
+                        break
+
+        with (
+            patch("src.auth._config_dir", return_value=self.directory),
+            patch("builtins.print", side_effect=show_url),
+            patch("src.auth.webbrowser.open") as browser,
+            patch("src.auth._exchange", side_effect=self._tokens),
+            patch("src.auth.jwt.PyJWKClient", return_value=jwks_client),
+        ):
+            self.assertEqual(auth.login(method="manual"), "user@example.com")
+        browser.assert_not_called()
+        self.assertIn("127.0.0.1", output.getvalue())
+
+    def test_interactive_method_selection(self) -> None:
+        with patch("src.cli.sys.stdin.isatty", return_value=True):
+            with patch("builtins.input", side_effect=["invalid", "2"]):
+                self.assertEqual(cli._login_method(), "headless")
+            with patch("builtins.input", return_value="3"):
+                self.assertEqual(cli._login_method(), "api-key")
+            with patch("builtins.input", return_value=""):
+                self.assertEqual(cli._login_method(), "browser")
+        with patch("src.cli.sys.stdin.isatty", return_value=False):
+            self.assertEqual(cli._login_method(), "browser")
+
+    def test_headless_import_keeps_local_host_id(self) -> None:
+        jwk = SimpleNamespace(key=self.key.public_key())
+        jwks_client = SimpleNamespace(get_signing_key_from_jwt=lambda token: jwk)
+        local = self.directory / "local"
+        remote = self.directory / "remote"
+        with (
+            patch("src.auth._config_dir", return_value=local),
+            patch("src.auth.webbrowser.open", side_effect=self._open_browser),
+            patch("src.auth._exchange", side_effect=self._tokens),
+            patch("src.auth.jwt.PyJWKClient", return_value=jwks_client),
+        ):
+            auth.login()
+        local_id = json.loads((local / "host.json").read_text())["ext_agent_host_id"]
+        with (
+            patch("src.auth._config_dir", return_value=remote),
+            patch("src.auth.jwt.PyJWKClient", return_value=jwks_client),
+        ):
+            self.assertIsNone(auth.import_headless(None))
+            remote_id = json.loads((remote / "host.json").read_text())["ext_agent_host_id"]
+            self.assertEqual(auth.import_headless(str(local / "credentials.json")), "user@example.com")
+        self.assertNotEqual(local_id, remote_id)
+        self.assertEqual(json.loads((remote / "credentials.json").read_text())["ext_agent_host_id"], remote_id)
+        self.assertEqual(json.loads((remote / "active.json").read_text()), {"method": "chatgpt"})
+
+    def test_api_key_validation_and_failure_do_not_overwrite_credentials(self) -> None:
+        response = MagicMock()
+        response.__enter__.return_value.status = 200
+        with (
+            patch("src.auth._config_dir", return_value=self.directory),
+            patch("src.auth.getpass.getpass", return_value="sk-test-secret"),
+            patch("src.auth.urlopen", return_value=response) as request,
+        ):
+            self.assertEqual(auth.login_api_key(), "OpenAI Platform API key（従量課金）")
+        self.assertEqual(request.call_args.args[0].get_header("Authorization"), "Bearer sk-test-secret")
+        self.assertEqual(json.loads((self.directory / "api-key.json").read_text())["api_key"], "sk-test-secret")
+        self.assertEqual(json.loads((self.directory / "active.json").read_text()), {"method": "api-key"})
+        with (
+            patch("src.auth._config_dir", return_value=self.directory),
+            patch("src.auth.getpass.getpass", return_value="sk-invalid"),
+            patch("src.auth.urlopen", side_effect=HTTPError("https://api.openai.com/v1/models", 401, "unauthorized", {}, None)),
+        ):
+            with self.assertRaisesRegex(auth.LoginError, "401"):
+                auth.login_api_key()
+        self.assertEqual(json.loads((self.directory / "api-key.json").read_text())["api_key"], "sk-test-secret")
 
 
 if __name__ == "__main__":

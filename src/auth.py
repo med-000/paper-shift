@@ -1,6 +1,7 @@
 """Official Sign in with ChatGPT flow for local open-source clients."""
 
 import base64
+import getpass
 import hashlib
 import hmac
 import json
@@ -176,8 +177,10 @@ def _verify_identity(id_token: str, client_id: str, nonce: str) -> dict:
     return claims
 
 
-def login() -> str:
+def login(method: str = "browser") -> str:
     """Run the browser OAuth flow and save an authorized ChatGPT account locally."""
+    if method not in ("browser", "manual"):
+        raise LoginError("ログイン方法が不正です。")
     directory = _config_dir()
     host_id = _host_id(directory)
     existing = _load_json(directory / "credentials.json")
@@ -207,9 +210,13 @@ def login() -> str:
         if not previous_client:
             params["agent_name_hint"] = "PaperShift"
         auth_url = f"{AUTHORIZE_URL}?{urlencode(params)}"
-        print("ChatGPTの認証ページをブラウザで開きます。完了まで最大5分待ちます。")
-        if not webbrowser.open(auth_url):
-            print(f"ブラウザを開けない場合は、次のURLを開いてください:\n{auth_url}")
+        if method == "manual":
+            print(f"次のURLをこの端末のブラウザで開いてください（5分以内）:\n{auth_url}")
+            print("認証後はこの端末の127.0.0.1に戻るため、別の端末のブラウザでは完了しません。")
+        else:
+            print("ChatGPTの認証ページをブラウザで開きます。完了まで最大5分待ちます。")
+            if not webbrowser.open(auth_url):
+                print(f"ブラウザを開けない場合は、次のURLを開いてください:\n{auth_url}")
         callback = _callback(server, state, time.monotonic() + 300)
 
     if callback.get("error"):
@@ -254,4 +261,82 @@ def login() -> str:
         "saved_at": datetime.now(timezone.utc).isoformat(),
     }
     _save_json(directory / "credentials.json", record)
+    _save_json(directory / "active.json", {"method": "chatgpt"})
     return record["email"] or claims["sub"]
+
+
+def import_headless(source: str | None) -> str | None:
+    """Import credentials obtained locally, keeping this machine's host ID."""
+    directory = _config_dir()
+    host_id = _host_id(directory)
+    if source is None:
+        print("headless端末のChatGPT認証手順:")
+        print("  1. ブラウザが使える手元の端末で `pshift login --method browser` を実行")
+        print("  2. 手元の認証ファイルをSSHなどの安全な方法でheadless端末に転送")
+        print("     macOS/Linux: ~/.config/papershift/credentials.json")
+        print("     Windows: %LOCALAPPDATA%\\PaperShift\\credentials.json")
+        print("  3. headless端末で `pshift login --method headless --from-file <転送したファイル>` を実行")
+        print("認証ファイルにはアクセストークンと更新トークンが含まれます。公開・共有しないでください。")
+        return None
+
+    try:
+        incoming = _load_json(Path(source))
+    except OSError as error:
+        raise LoginError("転送された認証ファイルを読めません。") from error
+    if incoming is None:
+        raise LoginError("転送された認証ファイルが見つかりません。")
+    client_id = incoming.get("client_id")
+    if not isinstance(client_id, str) or not CLIENT_ID_PATTERN.fullmatch(client_id):
+        raise LoginError("転送されたクライアントIDが不正です。")
+    if incoming.get("issuer") != ISSUER:
+        raise LoginError("転送された認証情報の発行元が不正です。")
+    if not isinstance(incoming.get("id_token"), str):
+        raise LoginError("転送されたIDトークンがありません。")
+    try:
+        key = jwt.PyJWKClient(JWKS_URL, timeout=15).get_signing_key_from_jwt(incoming["id_token"])
+        claims = jwt.decode(
+            incoming["id_token"], key.key, algorithms=["RS256"],
+            audience=client_id, issuer=ISSUER,
+            options={"require": ["iss", "aud", "sub", "iat", "exp"], "verify_exp": False},
+        )
+    except (jwt.PyJWTError, URLError, TimeoutError, ValueError) as error:
+        raise LoginError("転送されたIDトークンを検証できませんでした。") from error
+    if not isinstance(claims.get("sub"), str) or not claims["sub"] or claims["sub"] != incoming.get("subject"):
+        raise LoginError("転送されたアカウントIDが一致しません。")
+    if not all(isinstance(incoming.get(field), str) and incoming[field] for field in ("access_token", "refresh_token")):
+        raise LoginError("転送された認証情報に必要なトークンがありません。")
+    scopes = incoming.get("scopes")
+    if not isinstance(scopes, list) or not all(isinstance(scope, str) for scope in scopes) or not {"offline_access", "resource.invoke", "chatgpt.tokens.use.direct"}.issubset(scopes):
+        raise LoginError("転送された認証情報にはChatGPTプラン利用権限がありません。")
+    existing = _load_json(directory / "credentials.json")
+    if existing and (existing.get("subject"), existing.get("client_id")) != (claims["sub"], client_id):
+        raise LoginError("既存のChatGPTアカウントと異なります。")
+    incoming["ext_agent_host_id"] = host_id
+    incoming["email"] = claims.get("email") if isinstance(claims.get("email"), str) else None
+    _save_json(directory / "credentials.json", incoming)
+    _save_json(directory / "active.json", {"method": "chatgpt"})
+    return incoming["email"] or claims["sub"]
+
+
+def login_api_key() -> str:
+    """Validate and store a user-supplied Platform API key separately from ChatGPT."""
+    print("API keyはChatGPT Pro/Plusプランとは別のOpenAI Platform従量課金です。")
+    key = getpass.getpass("OpenAI API key: ").strip()
+    if not key:
+        raise LoginError("API keyが入力されていません。")
+    request = Request(
+        "https://api.openai.com/v1/models",
+        headers={"Authorization": f"Bearer {key}", "Accept": "application/json"},
+    )
+    try:
+        with urlopen(request, timeout=15) as response:
+            if response.status != 200:
+                raise LoginError("API keyを検証できませんでした。")
+    except HTTPError as error:
+        raise LoginError(f"API keyの検証に失敗しました (HTTP {error.code})。") from error
+    except (URLError, TimeoutError) as error:
+        raise LoginError("API keyの検証中に通信エラーが発生しました。") from error
+    directory = _config_dir()
+    _save_json(directory / "api-key.json", {"api_key": key})
+    _save_json(directory / "active.json", {"method": "api-key"})
+    return "OpenAI Platform API key（従量課金）"

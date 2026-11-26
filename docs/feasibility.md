@@ -12,6 +12,8 @@ OpenAIはオープンソース・ローカル実行アプリ向けに、ユー�
 
 `pshift login`の初回・再認証フローとstate検証はローカルの模擬応答で確認済みです。実際のアカウントでのログイン、トークン更新、固定英文の推論はまだ検証していません。
 
+ログイン時はブラウザ認証、headless端末への[保護した認証情報の転送](https://developers.openai.com/siwc/token-sharing-open-source/self-hosted-vms)、OpenAI Platform API keyを選べます。[Codex CLIのデバイスコード認証](https://developers.openai.com/codex/auth#login-on-headless-devices)はCodex向けで、PaperShiftの[OSS向け直接認証手順](https://developers.openai.com/siwc/token-sharing-open-source/sign-in)にはデバイスコードの利用方法が示されていないため、ワンタイムコード方式は未対応です。API keyはChatGPTプランではなく別の従量課金です。API keyの有効性はモデル一覧APIで確認しますが、特定モデルの利用可否や推論完了は別途検証が必要です。
+
 ## 日本語版PDFの生成
 
 PDFの文字には座標があっても、段落・読み順・数式の意味が常に得られるわけではありません。複数カラム、スキャンPDF、表のセル、長くなった訳文は特に難しい領域です。日本語フォントの埋め込み、原文の隠し方、訳文の配置と改行が保存後も成立する必要があります。元PDFに白い領域を重ねるだけでは、背後の英語テキストがPDF内に残る場合があります。
