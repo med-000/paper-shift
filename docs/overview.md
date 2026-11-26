@@ -21,7 +21,7 @@ PDF処理と翻訳プロバイダーは分けますが、汎用フレームワ�
 
 ## ライセンス方針
 
-PaperShiftは**AGPLv3でOSS公開する方針**です。PyMuPDFのAGPLv3版をPDF処理の第一候補とします。正式な`LICENSE`ファイル、著作権・依存ライブラリの表記は整備予定です。生成した翻訳済みPDFにAGPLv3が自動的に適用されるわけではありません。
+PaperShiftのソースコードは[AGPLv3](../LICENSE)で公開します。PyMuPDFはAGPLv3版を利用します。同梱のNotoフォントは各フォントのSIL Open Font Licenseに従います。生成した翻訳済みPDFにAGPLv3が自動的に適用されるわけではありません。
 
 ## MVPの完成条件
 

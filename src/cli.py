@@ -44,7 +44,7 @@ def _choose_model(models: list[tuple[str, str]], current: str | None) -> str | N
 def main() -> None:
     parser = argparse.ArgumentParser(
         prog="pshift",
-        description="PDF翻訳ツール（翻訳機能は今後実装予定）",
+        description="英語論文PDFを日本語PDFに翻訳するツール",
     )
     parser.add_argument(
         "--version",

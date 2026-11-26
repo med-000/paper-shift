@@ -1,40 +1,64 @@
 # PaperShift
 
-英語論文などのPDFを、図・表・数式をできるだけ残しながら日本語版PDFにするオープンソースのCLIツールです。まずはmacOS・Windowsでのローカル実行を目指します。
+**英語論文PDFを、日本語で読めるPDFに。** 元PDFのページ数・図・画像・線画をできるだけ保ちながら、抽出した英文を翻訳して同じページの近い位置に配置するオープンソースのCLIです。生成された日本語は画像ではなく、選択・検索できるPDFテキストです。
 
-> **開発初期段階：** ソース版で認証、モデル選択、短文翻訳、テキストPDFから日本語PDFへの出力を試せます。7ページの論文PDFでページ数・画像・線画を保った出力を確認済みです。公開中のv0.1.0実行ファイルには未収録で、Windows向け配布は未検証です。
+> **v0.2.0:** macOS Apple Silicon（arm64）向けに配布。Windows・Intel Mac用の実行ファイルはまだありません。テキストを抽出できるPDFが対象で、スキャンPDFのOCRには未対応です。
 
-## 開発環境から起動
+- [インストールと最初の翻訳](#macosapple-siliconで使う)
+- [ソースからの実行](#ソースから使う)
+- [仕組み・制限](#仕組みと現在の範囲)
 
-Python 3.11以降と[uv](https://docs.astral.sh/uv/getting-started/installation/)を用意し、リポジトリのルートで実行します。
+## macOS（Apple Silicon）で使う
+
+ターミナルでインストールします。Python・uv・Gitは不要です。
 
 ```sh
-uv run pshift --help
-uv run pshift login
-uv run pshift status
-uv run pshift translate "The results were significant."
-uv run pshift pdf paper.pdf -o paper-ja.pdf
-uv run pshift model  # 必要ならモデルを変更
-uv run pshift logout
-uv run pshift login --method headless
-uv run pshift login --method api-key
+curl -fsSL https://raw.githubusercontent.com/med-000/paper-shift/main/scripts/install-online-macos.sh | sh
 ```
 
-対話式で矢印キーとEnterを使い、ChatGPTのブラウザ認証、headless端末への認証情報の取り込み、OpenAI Platform API keyを選べます。`--method browser`、`--method headless`、`--method api-key`で直接指定できます。`pshift status`では現在の方式、保存済みのChatGPTメールアドレスとAPI keyの値を表示します（OAuthトークンは表示しません）。headless方式は手元の端末でブラウザ認証した後、安全に転送した`credentials.json`を`--from-file`で取り込みます。ワンタイムコード方式ではありません。API keyは**ChatGPTプランの対象外で、利用時には別途従量課金**です。
+新しいターミナルを開き、ChatGPTアカウントで認証してPDFを翻訳します。
 
-`pshift logout`はChatGPTの更新トークン失効を試み、保存済みのChatGPTトークンとAPI keyを端末から削除します。ネットワークエラーで失効を確認できなかった場合もローカルからは削除し、その結果を表示します。API key自体をOpenAI Platformで無効化する操作は含みません。
+```sh
+pshift login                         # 矢印キーでChatGPT Pro/Plus (browser)を選択
+pshift pdf paper.pdf -o paper-ja.pdf  # 英語PDF → 日本語PDF
+```
 
-モデルを選ばずに`pshift translate "英文"`を実行すると、ログイン中のアカウントのモデル一覧の先頭をデフォルトとして保存し、翻訳します。`pshift model`で後から変更できます。ターミナルで選択できない場合は`pshift model --list`で一覧を見て`pshift model <slug>`で指定してください。モデル一覧への表示だけでは利用可能とは限らず、翻訳が完了したときに推論を確認できます。API keyでの翻訳はChatGPTプラン外の従量課金です。
+初回はブラウザで認証と許可を行います。モデルを選んでいなければ、アカウントのモデル一覧の先頭を自動で保存します。入力はローカルのPDFファイルです。出力先`-o`を省くと元のファイル名に`-ja`を付けます。既存の出力を上書きするときだけ`--force`を付けてください。長い論文はモデルへの複数回の問い合わせが必要なため、処理に時間がかかることがあります。
 
-`pshift pdf paper.pdf -o paper-ja.pdf`は元PDFのページ数とページサイズを保ち、抽出できた英文をブロックごとに同じページの近い位置へ日本語で配置します。複数ブロックをまとめて翻訳し、元の領域へ対応付けます。出力先を省略すると`paper-ja.pdf`です。画像・線画と参考文献は元のまま残します。細かいヘッダー・脚注、図内の文字、数式の判定や段組みの精密な再配置は未対応です。スキャンPDFなど、抽出可能な英文がないPDFは処理できません。既存ファイルを上書きする場合だけ`--force`を付けます。
+```sh
+pshift status                         # 保存済みの認証方式を確認
+pshift model                          # 利用するモデルを選択
+pshift model --list                   # モデル一覧を表示
+pshift translate "The results were significant."  # 短文の翻訳
+pshift pdf --help                     # PDFコマンドのオプション
+pshift logout                        # ローカルの認証情報を削除
+```
 
-訳文には同梱のNoto Sans JPとNoto Serif JPを埋め込みます。タイトル・Abstract・本文など元PDFの各ブロックの文字サイズと太さを読み取り、収まりきらないブロックだけ縮小します。著者名・所属や投稿情報は元の書式で残します。
+アンインストールは`sh "$HOME/.local/share/papershift/uninstall-macos.sh"`で行えます。
 
-ChatGPTへのログインはブラウザで本人が許可する必要があります。認証情報はリポジトリ外（macOSでは`~/.config/papershift/`、Windowsでは`%LOCALAPPDATA%\PaperShift\`）に保存します。API keyは別ファイルに保存し、最後に成功した方式を記録します。
+## ソースから使う
 
-## ドキュメント
+macOS・Windowsでは、Python 3.11以降と[uv](https://docs.astral.sh/uv/getting-started/installation/)を用意して、リポジトリのルートから実行できます。Windowsでの実行ファイル配布は未検証です。
 
-- [プロダクト概要・技術スタック・MVP条件](docs/overview.md)
-- [技術的な懸念と公式資料](docs/feasibility.md)
-- [開発ロードマップ](docs/roadmap.md)
-- [ビルド・インストール・配布](docs/distribution.md)
+```sh
+uv run pshift login
+uv run pshift pdf paper.pdf -o paper-ja.pdf
+```
+
+headless端末では、ブラウザがある端末で認証した後、保護した認証ファイルを転送して`pshift login --method headless --from-file <ファイル>`で取り込みます。`pshift login --method api-key`も選べますが、**API keyはChatGPTプランとは別のOpenAI Platform従量課金**です。自動でAPI key方式へ切り替えることはありません。
+
+## 仕組みと現在の範囲
+
+1. PyMuPDFでPDFの英文ブロックと座標・文字サイズ・太さを取得する。
+2. 対象テキストを複数ブロックずつ、ログイン中のアカウントで翻訳する。PDFファイル全体は送信しない。
+3. 元ページ上の英文を取り除き、同梱のNoto Sans JP / Noto Serif JPで日本語を配置して保存する。
+
+ページ数・ページサイズを保ち、画像と線画は元ページに残します。長い訳文が収まらないブロックは必要に応じて縮小します。参考文献は検出できた場合に原文を維持します。著者・所属、投稿情報、小さなヘッダー・脚注などは原文のまま残る場合があります。図中の文字や数式の判定、複雑な段組みの精密な再現、スキャンPDFのOCRにはまだ対応していません。訳文が収まらない場合は不完全なPDFを保存せずに終了します。
+
+認証ファイルはリポジトリ外の`~/.config/papershift/`（macOS）または`%LOCALAPPDATA%\PaperShift\`（Windows）に保存します。`pshift status`は保存済みの認証状態を表示しますが、現在のトークンの有効性は保証しません。
+
+## 開発・ライセンス
+
+- [技術方針](docs/overview.md) · [検証事項と制限](docs/feasibility.md) · [ロードマップ](docs/roadmap.md) · [ビルド・配布](docs/distribution.md)
+- ソースコード: [GNU AGPLv3](LICENSE)。同梱のNotoフォントにはそれぞれの[SIL Open Font License](src/fonts/README.md)が適用されます。
+- v0.1.0はCLIの起動確認用の旧リリースです。PDF翻訳はv0.2.0以降を使用してください。

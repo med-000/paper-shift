@@ -2,7 +2,7 @@
 
 ## 現在の構成
 
-ソース版ではChatGPTプランでの短文翻訳と、合成サンプルの日本語PDF保存まで確認済みです。公開済みのv0.1.0実行ファイルは`--help`と`--version`のみで、PDF翻訳は含みません。`ps`はmacOSの標準コマンドと衝突するため使いません。
+ソース版ではChatGPTプランでの短文翻訳と、実論文の日本語PDF保存を確認済みです。v0.2.0は認証・モデル選択・PDF翻訳を含むmacOS arm64向けリリースです。v0.1.0実行ファイルは`--help`と`--version`のみの旧版です。`ps`はmacOSの標準コマンドと衝突するため使いません。
 
 ```text
 paper-shift/
@@ -64,7 +64,7 @@ PyInstallerでPython込みの単体実行ファイルを作ります。ビルド
 sh scripts/build-macos.sh
 ```
 
-`dist/pshift-macos-<arch>.tar.gz`が生成されます。GitHub Releaseに添付済みのv0.1.0アーカイブは以前のビルドで、`login`や`pdf`を含みません。手動配布の場合は利用者がアーカイブを展開し、そのフォルダで次を実行します。利用者にPython・uv・Gitは不要です。
+`dist/pshift-macos-<arch>.tar.gz`が生成されます。v0.2.0のmacOS arm64向けアーカイブは`login`や`pdf`を含みます。手動配布の場合は利用者がアーカイブを展開し、そのフォルダで次を実行します。利用者にPython・uv・Gitは不要です。
 
 ```sh
 sh install-macos.sh
@@ -80,7 +80,7 @@ sh install-macos.sh
 curl -fsSL https://raw.githubusercontent.com/med-000/paper-shift/main/scripts/install-online-macos.sh | sh
 ```
 
-オンラインスクリプトはデフォルトで[GitHub Releasesのlatest](https://github.com/med-000/paper-shift/releases/latest)から`pshift-macos-<arch>.tar.gz`を取得します。**v0.1.0のmacOS arm64版は公開済み**で、一行インストール・起動・アンインストールを確認しました。ただし翻訳機能は未実装です。Intel Mac向けビルドはまだありません。ローカルで別の配布先を検証するときは`PAPERSHIFT_RELEASE_BASE_URL`で上書きできます。Homebrew対応は後から追加します。
+オンラインスクリプトはデフォルトで[GitHub Releasesのlatest](https://github.com/med-000/paper-shift/releases/latest)から`pshift-macos-<arch>.tar.gz`を取得します。**v0.2.0のmacOS arm64版にはPDF翻訳を収録**しています。Intel Mac向けビルドはまだありません。ローカルで別の配布先を検証するときは`PAPERSHIFT_RELEASE_BASE_URL`で上書きできます。Homebrew対応は後から追加します。
 
 ## Windows（未検証）
 
