@@ -2,7 +2,7 @@
 
 英語論文などのPDFを、図・表・数式をできるだけ残しながら日本語版PDFにするオープンソースのCLIツールです。まずはmacOS・Windowsでのローカル実行を目指します。
 
-> **開発初期段階：** 現在は`pshift --help`と`--version`のみ動作します。ChatGPT認証、PDF翻訳、Windows向け配布は未実装です。
+> **開発初期段階：** ソース版に`pshift login`を追加しました。実際のChatGPTアカウントでの動作確認はまだです。公開中のv0.1.0実行ファイルには未収録で、PDF翻訳とWindows向け配布も未実装です。
 
 ## 開発環境から起動
 
@@ -10,7 +10,10 @@ Python 3.11以降と[uv](https://docs.astral.sh/uv/getting-started/installation/
 
 ```sh
 uv run pshift --help
+uv run pshift login
 ```
+
+ログインはブラウザで本人が許可する必要があります。アカウントの認証情報はリポジトリ外（macOSでは`~/.config/papershift/`、Windowsでは`%LOCALAPPDATA%\PaperShift\`）に保存します。プラン利用権限の取得と、実際にモデルで翻訳できるかの検証は別の段階です。
 
 ## ドキュメント
 

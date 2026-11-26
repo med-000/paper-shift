@@ -2,7 +2,7 @@
 
 ## 現在の構成
 
-現在はCLIの起動口のみ実装しています。`pshift --help`と`pshift --version`が使えますが、PDF翻訳はまだ動きません。`ps`はmacOSの標準コマンドと衝突するため使いません。
+ソース版には`pshift login`の認証フローがありますが、実アカウントによるログイン成功は未検証です。公開済みのv0.1.0実行ファイルは`--help`と`--version`のみで、PDF翻訳はまだ動きません。`ps`はmacOSの標準コマンドと衝突するため使いません。
 
 ```text
 paper-shift/
@@ -21,7 +21,8 @@ paper-shift/
 ├── src/
 │   ├── __init__.py
 │   ├── __main__.py         # python -m src の起動口
-│   └── cli.py              # pshift コマンドの起動口
+│   ├── cli.py              # pshift コマンドの起動口
+│   └── auth.py             # ChatGPT認証フロー
 ├── docs/
 └── README.md
 ```
@@ -35,6 +36,7 @@ paper-shift/
 ```sh
 uv run pshift --help
 uv run pshift --version
+uv run pshift login
 ```
 
 ## macOS（arm64で動作確認済み）
@@ -45,7 +47,7 @@ PyInstallerでPython込みの単体実行ファイルを作ります。ビルド
 sh scripts/build-macos.sh
 ```
 
-`dist/pshift-macos-<arch>.tar.gz`が生成されます。手動配布の場合は利用者がアーカイブを展開し、そのフォルダで次を実行します。利用者にPython・uv・Gitは不要です。
+`dist/pshift-macos-<arch>.tar.gz`が生成されます。ソース版からビルドしたアーカイブには`login`が入りますが、実アカウントでの認証は未検証です。GitHub Releaseに添付済みのv0.1.0アーカイブは以前のビルドで、`login`を含みません。手動配布の場合は利用者がアーカイブを展開し、そのフォルダで次を実行します。利用者にPython・uv・Gitは不要です。
 
 ```sh
 sh install-macos.sh

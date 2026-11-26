@@ -3,6 +3,8 @@
 import argparse
 from importlib.metadata import version
 
+from src.auth import LoginError, login
+
 
 def main() -> None:
     parser = argparse.ArgumentParser(
@@ -14,4 +16,16 @@ def main() -> None:
         action="version",
         version=f"%(prog)s {version('paper-shift')}",
     )
-    parser.parse_args()
+    subcommands = parser.add_subparsers(dest="command")
+    subcommands.add_parser("login", help="ChatGPTアカウントでログイン")
+    args = parser.parse_args()
+    if args.command == "login":
+        try:
+            identity = login()
+        except KeyboardInterrupt:
+            parser.exit(130, "\nログインを中断しました。\n")
+        except (LoginError, OSError) as error:
+            parser.exit(1, f"ログインに失敗しました: {error}\n")
+        print(f"ログインしました: {identity}")
+    else:
+        parser.print_help()
