@@ -6,7 +6,7 @@ import sys
 
 import questionary
 
-from src.auth import LoginError, import_headless, login, login_api_key
+from src.auth import LoginError, import_headless, login, login_api_key, logout
 
 
 def _login_method() -> str:
@@ -38,6 +38,7 @@ def main() -> None:
     )
     subcommands = parser.add_subparsers(dest="command")
     subcommands.add_parser("status", help="保存済みの認証状態を表示")
+    subcommands.add_parser("logout", help="保存済みの認証情報を削除")
     login_parser = subcommands.add_parser("login", help="ChatGPTまたはAPI keyで認証")
     login_parser.add_argument(
         "--method", choices=("browser", "headless", "api-key", "manual"),
@@ -48,7 +49,13 @@ def main() -> None:
         help="headless: 手元の端末から安全に転送したcredentials.jsonを取り込む",
     )
     args = parser.parse_args()
-    if args.command == "status":
+    if args.command == "logout":
+        try:
+            for line in logout():
+                print(line)
+        except (LoginError, OSError) as error:
+            parser.exit(1, f"ログアウトに失敗しました: {error}\n")
+    elif args.command == "status":
         from src.auth import status_lines
 
         try:

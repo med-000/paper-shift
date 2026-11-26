@@ -24,6 +24,7 @@ import jwt
 ISSUER = "https://auth.openai.com"
 AUTHORIZE_URL = f"{ISSUER}/api/accounts/authorize"
 TOKEN_URL = f"{ISSUER}/api/accounts/oauth/token"
+REVOCATION_URL = f"{ISSUER}/api/accounts/oauth/revoke"
 JWKS_URL = f"{ISSUER}/.well-known/jwks.json"
 RESOURCE = "https://api.openai.com/v1"
 CALLBACK_PATH = "/auth/callback"
@@ -59,6 +60,67 @@ def status_lines() -> list[str]:
     if has_api:
         lines.append(f"API key: {api['api_key']}")
     return lines
+
+
+def _revoke_refresh_token(client_id: str, refresh_token: str) -> bool:
+    request = Request(
+        REVOCATION_URL,
+        data=urlencode({
+            "token": refresh_token,
+            "token_type_hint": "refresh_token",
+            "client_id": client_id,
+        }).encode("utf-8"),
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+        method="POST",
+    )
+    for attempt in range(2):
+        try:
+            with urlopen(request, timeout=5) as response:
+                return response.status == 200
+        except HTTPError as error:
+            if error.code < 500 or attempt == 1:
+                return False
+        except (URLError, TimeoutError):
+            if attempt == 1:
+                return False
+        time.sleep(0.5)
+    return False
+
+
+def logout() -> list[str]:
+    """End the renewable session and remove both locally stored login methods."""
+    directory = _config_dir()
+    credentials = _load_json(directory / "credentials.json")
+    api = _load_json(directory / "api-key.json")
+    if credentials is None and api is None:
+        (directory / "active.json").unlink(missing_ok=True)
+        return ["ログイン情報はありません。"]
+
+    revoked = True
+    if credentials:
+        client_id = credentials.get("client_id")
+        refresh_token = credentials.get("refresh_token")
+        subject = credentials.get("subject")
+        if isinstance(client_id, str) and CLIENT_ID_PATTERN.fullmatch(client_id) and isinstance(subject, str) and subject:
+            # Keep the account/client association, but never retain credentials.
+            _save_json(directory / "registration.json", {
+                "client_id": client_id, "subject": subject,
+                "email": credentials.get("email") if isinstance(credentials.get("email"), str) else None,
+            })
+        if isinstance(client_id, str) and CLIENT_ID_PATTERN.fullmatch(client_id) and isinstance(refresh_token, str) and refresh_token:
+            revoked = _revoke_refresh_token(client_id, refresh_token)
+        else:
+            revoked = False
+
+    (directory / "credentials.json").unlink(missing_ok=True)
+    (directory / "api-key.json").unlink(missing_ok=True)
+    (directory / "active.json").unlink(missing_ok=True)
+    messages = ["この端末のログイン情報を削除しました。"]
+    if credentials and not revoked:
+        messages.append("ChatGPT側でのトークン失効は確認できませんでした。必要ならChatGPTの設定からPaperShiftの接続を解除してください。")
+    if api:
+        messages.append("API key自体はOpenAI Platformで有効なままです。")
+    return messages
 
 
 def _config_dir() -> Path:
@@ -210,7 +272,8 @@ def login(method: str = "browser") -> str:
     directory = _config_dir()
     host_id = _host_id(directory)
     existing = _load_json(directory / "credentials.json")
-    previous_client = existing.get("client_id") if existing else None
+    previous = existing or _load_json(directory / "registration.json")
+    previous_client = previous.get("client_id") if previous else None
     if previous_client is not None and (not isinstance(previous_client, str) or not CLIENT_ID_PATTERN.fullmatch(previous_client)):
         raise LoginError("保存済みのクライアントIDが不正です。")
 
@@ -270,7 +333,7 @@ def login(method: str = "browser") -> str:
         raise LoginError("ChatGPTプラン利用の権限が付与されませんでした。")
 
     claims = _verify_identity(tokens["id_token"], client_id, nonce)
-    if existing and (claims["sub"] != existing.get("subject") or client_id != existing.get("client_id")):
+    if previous and (claims["sub"] != previous.get("subject") or client_id != previous.get("client_id")):
         raise LoginError("保存済みのChatGPTアカウントと一致しません。")
     record = {
         "issuer": ISSUER,

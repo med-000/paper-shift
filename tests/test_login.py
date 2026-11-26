@@ -13,7 +13,7 @@ import time
 from types import SimpleNamespace
 import unittest
 from unittest.mock import MagicMock, patch
-from urllib.error import HTTPError
+from urllib.error import HTTPError, URLError
 from urllib.parse import parse_qs, urlencode, urlsplit
 from urllib.request import urlopen
 
@@ -237,6 +237,66 @@ class LoginTests(unittest.TestCase):
             with self.assertRaisesRegex(auth.LoginError, "401"):
                 auth.login_api_key()
         self.assertEqual(json.loads((self.directory / "api-key.json").read_text())["api_key"], "sk-test-secret")
+
+    def test_logout_revokes_chatgpt_and_removes_both_credentials(self) -> None:
+        jwk = SimpleNamespace(key=self.key.public_key())
+        jwks_client = SimpleNamespace(get_signing_key_from_jwt=lambda token: jwk)
+        with (
+            patch("src.auth._config_dir", return_value=self.directory),
+            patch("src.auth.webbrowser.open", side_effect=self._open_browser),
+            patch("src.auth._exchange", side_effect=self._tokens),
+            patch("src.auth.jwt.PyJWKClient", return_value=jwks_client),
+        ):
+            auth.login()
+            auth._save_json(self.directory / "api-key.json", {"api_key": "sk-test-secret"})
+            host_id = auth._host_id(self.directory)
+            with patch("src.auth._revoke_refresh_token", return_value=True) as revoke:
+                messages = auth.logout()
+            revoke.assert_called_once_with("oaiapp_test", "test-refresh-token")
+            self.assertIn("削除しました", messages[0])
+            self.assertEqual(auth.status_lines(), ["現在の認証: 未ログイン"])
+            self.assertEqual(json.loads((self.directory / "registration.json").read_text())["subject"], "test-subject")
+            self.assertEqual(auth._host_id(self.directory), host_id)
+            self.assertEqual(auth.logout(), ["ログイン情報はありません。"])
+            self.assertEqual(auth.login(), "user@example.com")
+        self.assertEqual(self.urls[-1]["client_id"], "oaiapp_test")
+        self.assertNotIn("agent_name_hint", self.urls[-1])
+
+    def test_logout_clears_local_tokens_when_revocation_fails(self) -> None:
+        with patch("src.auth._config_dir", return_value=self.directory):
+            auth._save_json(self.directory / "credentials.json", {
+                "client_id": "oaiapp_test", "subject": "test-subject", "refresh_token": "test-refresh-token",
+            })
+            with patch("src.auth._revoke_refresh_token", return_value=False):
+                messages = auth.logout()
+            self.assertIn("失効は確認できません", messages[1])
+            self.assertFalse((self.directory / "credentials.json").exists())
+            self.assertEqual(auth.status_lines(), ["現在の認証: 未ログイン"])
+
+    def test_revocation_posts_refresh_token(self) -> None:
+        response = MagicMock()
+        response.__enter__.return_value.status = 200
+        with patch("src.auth.urlopen", return_value=response) as urlopen_mock:
+            self.assertTrue(auth._revoke_refresh_token("oaiapp_test", "test-refresh-token"))
+        request = urlopen_mock.call_args.args[0]
+        self.assertEqual(request.full_url, auth.REVOCATION_URL)
+        self.assertEqual(request.get_method(), "POST")
+        self.assertEqual(parse_qs(request.data.decode()), {
+            "client_id": ["oaiapp_test"],
+            "token": ["test-refresh-token"],
+            "token_type_hint": ["refresh_token"],
+        })
+
+    def test_revocation_retries_a_transient_network_error(self) -> None:
+        response = MagicMock()
+        response.__enter__.return_value.status = 200
+        with (
+            patch("src.auth.urlopen", side_effect=[URLError("offline"), response]) as urlopen_mock,
+            patch("src.auth.time.sleep") as sleep,
+        ):
+            self.assertTrue(auth._revoke_refresh_token("oaiapp_test", "test-refresh-token"))
+        self.assertEqual(urlopen_mock.call_count, 2)
+        sleep.assert_called_once()
 
 
 if __name__ == "__main__":
