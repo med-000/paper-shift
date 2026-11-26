@@ -1,0 +1,16 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "paper-shift"
+version = "0.1.0"
+description = "Translate research papers into Japanese PDFs using your ChatGPT plan."
+readme = "README.md"
+requires-python = ">=3.11"
+
+[project.scripts]
+pshift = "src.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src"]

@@ -1,0 +1,47 @@
+# Python / virtual environments
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.Python
+*.egg-info/
+
+# Local checks and coverage
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.hypothesis/
+.coverage
+.coverage.*
+htmlcov/
+
+# PyInstaller and package builds
+dist/
+build/
+pshift.spec
+
+# Local papers and generated PDFs (add public fixtures explicitly with git add -f)
+*.[pP][dD][fF]
+
+# Local credentials and environment settings
+.env
+.env.*
+!.env.example
+.papershift/
+.paper-shift/
+credentials.json
+tokens.json
+*.pem
+*.key
+
+# OS and editor state
+.DS_Store
+Thumbs.db
+Desktop.ini
+.idea/
+*.swp
+*.swo
+
+# Temporary output
+*.log
+*.tmp
