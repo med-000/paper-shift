@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 import re
 import tempfile
+from concurrent.futures import ThreadPoolExecutor
 from collections.abc import Callable
 from dataclasses import dataclass
 
@@ -88,6 +89,22 @@ def _text_blocks(page: pymupdf.Page) -> list[TextBlock]:
     return blocks
 
 
+def _reference_start(page: pymupdf.Page) -> float | None:
+    """Find a reference heading even when PyMuPDF merges it with citation lines."""
+    for block in page.get_text("dict", sort=True)["blocks"]:
+        if block["type"] != 0:
+            continue
+        for line in block["lines"]:
+            text = "".join(span["text"] for span in line["spans"]).strip()
+            if re.fullmatch(r"(?:[IVX]+\.|\d+\.?\s+)?(?:references|bibliography|works cited)\s*:?", text, re.IGNORECASE):
+                return float(line["bbox"][1])
+    return None
+
+
+def _citation_block(text: str) -> bool:
+    return bool(re.match(r"\s*\d{1,3}\.\s*(?:\n|[A-Z])", text))
+
+
 def _register_fonts(page: pymupdf.Page) -> None:
     for name, path in FONTS.items():
         if not path.is_file():
@@ -145,7 +162,7 @@ def _layout(
         if remaining < 0:
             return None, index
         visible = [pymupdf.Rect(span["bbox"])
-                   for rendered in canvas.get_text("dict")["blocks"] if rendered["type"] == 0
+                   for rendered in canvas.get_text("dict", clip=area)["blocks"] if rendered["type"] == 0
                    for line in rendered["lines"] for span in line["spans"]
                    if span["bbox"][1] >= start - 1
                    and (pymupdf.Rect(span["bbox"]) & area).width >= pymupdf.Rect(span["bbox"]).width * 0.8]
@@ -226,51 +243,64 @@ def translate_pdf(
             raise PdfError("暗号化されていないページ付きのPDFを指定してください。")
         translated = 0
         in_references = False
-        for number, page in enumerate(document, start=1):
-            raw_blocks = [block for block in page.get_text("blocks") if block[6] == 0]
-            headings = [pymupdf.Rect(block[:4]).y0 for block in raw_blocks
-                        if block[4].strip().lower() in ("references", "bibliography")]
-            reference_start = min(headings) if headings else None
-            blocks = [] if in_references else _text_blocks(page)
-            if reference_start is not None:
-                blocks = [block for block in blocks if block.rect.y0 < reference_start]
-                in_references = True
-            if not blocks:
+        # Network requests dominate PDF processing; bounded concurrency keeps
+        # independent batches in flight while preserving their original order.
+        with ThreadPoolExecutor(max_workers=3) as executor:
+            prepared = []
+            for number, page in enumerate(document, start=1):
+                reference_start = None if in_references else _reference_start(page)
+                blocks = [] if in_references else _text_blocks(page)
+                if reference_start is not None:
+                    blocks = [block for block in blocks if block.rect.y0 < reference_start
+                              and not _citation_block(block.text)]
+                    in_references = True
+                if not blocks:
+                    prepared.append((number, blocks, [], []))
+                    continue
+                fragments = [(index, fragment) for index, block in enumerate(blocks) for fragment in _chunks(block.text)]
+                pending = []
+                processed = 0
+                while processed < len(fragments):
+                    batch = []
+                    length = 0
+                    for index, fragment in fragments[processed:]:
+                        if batch and length + len(fragment) > 3000:
+                            break
+                        batch.append((index, fragment))
+                        length += len(fragment)
+                    pending.append((batch, executor.submit(translate_texts, [text for _, text in batch])))
+                    processed += len(batch)
+                raw_blocks = [block for block in page.get_text("blocks") if block[6] == 0]
+                prepared.append((number, blocks, raw_blocks, pending))
+
+            for number, blocks, raw_blocks, pending in prepared:
+                if not blocks:
+                    if progress:
+                        progress(number, document.page_count)
+                    continue
+                page = document[number - 1]
+                translations = [[] for _ in blocks]
+                for batch, future in pending:
+                    results = future.result()
+                    if len(results) != len(batch) or not all(isinstance(result, str) and result.strip() for result in results):
+                        raise PdfError(f"{number}ページ目の訳文と原文領域の対応が崩れました。")
+                    for (index, _), result in zip(batch, results):
+                        translations[index].append(result.strip())
+                # Only text that stays in the original PDF acts as a fixed obstacle.
+                obstacles = [pymupdf.Rect(raw[:4]) for raw in raw_blocks
+                             if not any((pymupdf.Rect(raw[:4]) & block.rect).get_area() >= block.rect.get_area() * 0.9
+                                        for block in blocks)]
+                layout = _choose_layout(page, blocks, ["".join(parts) for parts in translations], obstacles)
+                for block in blocks:
+                    page.add_redact_annot(block.rect, fill=False, cross_out=False)
+                page.apply_redactions(images=0, graphics=0, text=0)
+                _register_fonts(page)
+                for area, text, font, size in layout:
+                    if page.insert_textbox(area, text, fontname=font, fontsize=size, lineheight=1.2) < 0:
+                        raise PdfError(f"{number}ページ目の訳文を配置できませんでした。")
+                    translated += 1
                 if progress:
                     progress(number, document.page_count)
-                continue
-            fragments = [(index, fragment) for index, block in enumerate(blocks) for fragment in _chunks(block.text)]
-            translations = [[] for _ in blocks]
-            processed = 0
-            while processed < len(fragments):
-                batch = []
-                length = 0
-                for index, fragment in fragments[processed:]:
-                    if batch and length + len(fragment) > 3000:
-                        break
-                    batch.append((index, fragment))
-                    length += len(fragment)
-                results = translate_texts([text for _, text in batch])
-                if len(results) != len(batch) or not all(isinstance(result, str) and result.strip() for result in results):
-                    raise PdfError(f"{number}ページ目の訳文と原文領域の対応が崩れました。")
-                for (index, _), result in zip(batch, results):
-                    translations[index].append(result.strip())
-                processed += len(batch)
-            # Only text that stays in the original PDF acts as a fixed obstacle.
-            obstacles = [pymupdf.Rect(raw[:4]) for raw in raw_blocks
-                         if not any((pymupdf.Rect(raw[:4]) & block.rect).get_area() >= block.rect.get_area() * 0.9
-                                    for block in blocks)]
-            layout = _choose_layout(page, blocks, ["".join(parts) for parts in translations], obstacles)
-            for block in blocks:
-                page.add_redact_annot(block.rect, fill=False, cross_out=False)
-            page.apply_redactions(images=0, graphics=0, text=0)
-            _register_fonts(page)
-            for area, text, font, size in layout:
-                if page.insert_textbox(area, text, fontname=font, fontsize=size, lineheight=1.2) < 0:
-                    raise PdfError(f"{number}ページ目の訳文を配置できませんでした。")
-                translated += 1
-            if progress:
-                progress(number, document.page_count)
         if translated == 0:
             raise PdfError("翻訳できる英文テキストがありません。画像だけのPDFは現在対象外です。")
 

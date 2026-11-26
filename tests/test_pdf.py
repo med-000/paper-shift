@@ -1,6 +1,7 @@
 """Verify saved Japanese text, page geometry, and non-destructive failure paths."""
 
 from pathlib import Path
+from threading import Barrier
 import tempfile
 import unittest
 from unittest.mock import Mock
@@ -109,6 +110,53 @@ class PdfTests(unittest.TestCase):
             self.assertIn("REFERENCES", doc[0].get_text())
             self.assertIn("Example author", doc[0].get_text())
             self.assertIn("Further work", doc[1].get_text())
+
+    def test_reference_heading_merged_with_citations_is_not_sent_to_model(self) -> None:
+        with pymupdf.open() as doc:
+            page = doc.new_page(width=400, height=600)
+            page.insert_text((40, 100), "The experiment was successful.", fontsize=11)
+            page.insert_textbox((40, 300, 350, 550),
+                                "References\n1. Example author, an English paper.\n2. Another author, more results.", fontsize=10)
+            page.insert_textbox((210, 60, 380, 180), "17. Xie, P. et al. A cited work.", fontsize=10)
+            page = doc.new_page(width=400, height=600)
+            page.insert_text((40, 100), "3. A continued English citation.", fontsize=10)
+            doc.save(self.source)
+        with pymupdf.open(self.source) as doc:
+            self.assertIn("References\n1.", doc[0].get_text())
+        translator = Mock(return_value=["実験は成功した。"])
+        self.assertEqual(translate_pdf(self.source, self.output, translator), (2, 1))
+        translator.assert_called_once_with(["The experiment was successful."])
+        with pymupdf.open(self.output) as doc:
+            self.assertIn("Example author", doc[0].get_text())
+            self.assertIn("continued English citation", doc[1].get_text())
+
+    def test_independent_batches_can_translate_concurrently(self) -> None:
+        with pymupdf.open() as doc:
+            page = doc.new_page(width=600, height=1200)
+            for y in (100, 400, 700, 1000):
+                page.insert_textbox((40, y, 550, y + 150), "A scientific result was observed. " * 30, fontsize=10)
+            doc.save(self.source)
+        barrier = Barrier(2, timeout=5)
+
+        def translate(texts: list[str]) -> list[str]:
+            barrier.wait()
+            return ["結果。" for _ in texts]
+
+        self.assertEqual(translate_pdf(self.source, self.output, translate), (1, 4))
+
+    def test_short_pages_are_submitted_before_waiting_for_first_translation(self) -> None:
+        with pymupdf.open() as doc:
+            for _ in range(2):
+                page = doc.new_page(width=400, height=600)
+                page.insert_text((40, 100), "The experiment was successful.", fontsize=11)
+            doc.save(self.source)
+        barrier = Barrier(2, timeout=5)
+
+        def translate(texts: list[str]) -> list[str]:
+            barrier.wait()
+            return ["実験は成功した。"]
+
+        self.assertEqual(translate_pdf(self.source, self.output, translate), (2, 2))
 
     def test_small_footer_stays_clear_of_translated_body(self) -> None:
         with pymupdf.open() as doc:
