@@ -19,12 +19,17 @@ if [ ! -f "$BINARY" ]; then
 fi
 
 mkdir -p "$HOME/.local/bin"
+mkdir -p "$HOME/.local/share/papershift"
 install -m 755 "$BINARY" "$HOME/.local/bin/pshift"
+UNINSTALL="$SCRIPT_DIR/uninstall-macos.sh"
+if [ -f "$UNINSTALL" ]; then
+    install -m 644 "$UNINSTALL" "$HOME/.local/share/papershift/uninstall-macos.sh"
+fi
 
 PROFILE="${ZDOTDIR:-$HOME}/.zprofile"
 ENTRY='export PATH="$HOME/.local/bin:$PATH"'
 if ! { [ -f "$PROFILE" ] && grep -Fqx "$ENTRY" "$PROFILE"; }; then
-    printf '\n%s\n' "$ENTRY" >> "$PROFILE"
+    printf '\n%s\n%s\n' '# PaperShift PATH' "$ENTRY" >> "$PROFILE"
 fi
 
 echo "インストールしました: $HOME/.local/bin/pshift"

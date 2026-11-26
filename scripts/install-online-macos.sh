@@ -6,11 +6,7 @@ if [ "$(uname -s)" != "Darwin" ]; then
     exit 1
 fi
 
-BASE_URL=${PAPERSHIFT_RELEASE_BASE_URL:-}
-if [ -z "$BASE_URL" ]; then
-    echo "公開URLはまだありません。リリース公開後にPAPERSHIFT_RELEASE_BASE_URLを設定してください。" >&2
-    exit 1
-fi
+BASE_URL=${PAPERSHIFT_RELEASE_BASE_URL:-https://github.com/med-000/paper-shift/releases/latest/download}
 
 case "$(uname -m)" in
     arm64|x86_64) ARCH=$(uname -m) ;;

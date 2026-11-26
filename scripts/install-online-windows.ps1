@@ -19,11 +19,13 @@ try {
     $destination = Join-Path $env:LOCALAPPDATA 'Programs/PaperShift'
     New-Item -ItemType Directory -Force -Path $destination | Out-Null
     Copy-Item -Force $binary (Join-Path $destination 'pshift.exe')
+    Copy-Item -Force (Join-Path $temporary 'uninstall-windows.ps1') (Join-Path $destination 'uninstall-windows.ps1')
 
     $userPath = [Environment]::GetEnvironmentVariable('Path', 'User')
     $entries = @($userPath -split ';' | Where-Object { $_ })
     if ($entries -notcontains $destination) {
         [Environment]::SetEnvironmentVariable('Path', (@($entries) + $destination) -join ';', 'User')
+        New-Item -ItemType File -Force -Path (Join-Path $destination '.path-added') | Out-Null
     }
     $currentEntries = @($env:Path -split ';' | Where-Object { $_ })
     if ($currentEntries -notcontains $destination) {

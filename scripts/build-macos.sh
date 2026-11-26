@@ -20,6 +20,6 @@ uv run --with pyinstaller pyinstaller \
 ARCH=$(uname -m)
 tar -czf "dist/pshift-macos-${ARCH}.tar.gz" \
     -C "$ROOT/dist" pshift \
-    -C "$ROOT/scripts" install-macos.sh
+    -C "$ROOT/scripts" install-macos.sh uninstall-macos.sh
 
 echo "作成しました: dist/pshift-macos-${ARCH}.tar.gz"

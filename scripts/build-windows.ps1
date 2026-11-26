@@ -14,7 +14,8 @@ try {
     $archive = Join-Path $root "dist/pshift-windows-$arch.zip"
     Compress-Archive -Force -Path @(
         (Join-Path $root 'dist/pshift.exe'),
-        (Join-Path $PSScriptRoot 'install-windows.ps1')
+        (Join-Path $PSScriptRoot 'install-windows.ps1'),
+        (Join-Path $PSScriptRoot 'uninstall-windows.ps1')
     ) -DestinationPath $archive
     Write-Host "作成しました: $archive"
 }
