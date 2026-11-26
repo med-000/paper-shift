@@ -1,0 +1,85 @@
+name: Build and release
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-15-arm64
+            platform: macos
+            archive: pshift-macos-arm64.tar.gz
+          - os: ubuntu-22.04
+            platform: linux
+            archive: pshift-linux-x86_64.tar.gz
+          - os: windows-2022
+            platform: windows
+            archive: pshift-windows-x64.zip
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - name: Test
+        run: uv run --locked python -m unittest discover -s tests -q
+      - name: Build macOS
+        if: matrix.platform == 'macos'
+        run: sh scripts/build-macos.sh
+      - name: Build Linux
+        if: matrix.platform == 'linux'
+        run: sh scripts/build-linux.sh
+      - name: Build Windows
+        if: matrix.platform == 'windows'
+        shell: pwsh
+        run: ./scripts/build-windows.ps1
+      - name: Smoke test Unix archive
+        if: matrix.platform != 'windows'
+        shell: bash
+        run: |
+          test "$(dist/pshift --version)" = "pshift 0.2.2"
+          mkdir -p smoke
+          tar -xzf "dist/${{ matrix.archive }}" -C smoke
+          test "$(smoke/pshift --version)" = "pshift 0.2.2"
+      - name: Smoke test Windows archive
+        if: matrix.platform == 'windows'
+        shell: pwsh
+        run: |
+          if ((& ./dist/pshift.exe --version) -ne 'pshift 0.2.2') { throw 'Wrong binary version' }
+          Expand-Archive -Path "dist/${{ matrix.archive }}" -DestinationPath smoke
+          if ((& ./smoke/pshift.exe --version) -ne 'pshift 0.2.2') { throw 'Wrong archive version' }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pshift-${{ matrix.platform }}
+          path: dist/${{ matrix.archive }}
+          if-no-files-found: error
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: pshift-*
+          merge-multiple: true
+          path: dist
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          fail_on_unmatched_files: true
+          generate_release_notes: true

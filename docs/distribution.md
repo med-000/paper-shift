@@ -2,7 +2,7 @@
 
 ## 現在の構成
 
-ソース版ではChatGPTプランでの短文翻訳と、実論文の日本語PDF保存を確認済みです。v0.2.1は認証・モデル選択・PDF翻訳に加え、翻訳リクエストの並列化と参考文献の判定改善を含むmacOS arm64向けリリースです。v0.1.0実行ファイルは`--help`と`--version`のみの旧版です。`ps`はmacOSの標準コマンドと衝突するため使いません。
+ソース版ではChatGPTプランでの短文翻訳と、実論文の日本語PDF保存を確認済みです。v0.2.2はmacOS arm64・Linux x86_64・Windows x64向けに認証・モデル選択・PDF翻訳を配布します。Intel Macは対象外です。`ps`はmacOSの標準コマンドと衝突するため使いません。
 
 ```text
 paper-shift/
@@ -14,10 +14,12 @@ paper-shift/
 │   ├── install-macos.sh    # 実行ファイルの配置とzshのPATH設定
 │   ├── uninstall-macos.sh  # macOS向けアンインストール
 │   ├── install-online-macos.sh   # リリースアーカイブの取得・インストール
+│   ├── build-linux.sh      # Linux x86_64用の実行ファイルと配布アーカイブ
+│   ├── install-linux.sh / uninstall-linux.sh / install-online-linux.sh
 │   ├── build-windows.ps1   # Windows用の実行ファイルと配布アーカイブ
 │   ├── install-windows.ps1 # 実行ファイルの配置とユーザーPATH設定
 │   ├── uninstall-windows.ps1 # Windows向けアンインストール
-│   └── install-online-windows.ps1 # 技術検証用オンライン取得
+│   └── install-online-windows.ps1 # リリースZIPの取得とインストール
 ├── src/
 │   ├── __init__.py
 │   ├── __main__.py         # python -m src の起動口
@@ -64,7 +66,7 @@ PyInstallerでPython込みの単体実行ファイルを作ります。ビルド
 sh scripts/build-macos.sh
 ```
 
-`dist/pshift-macos-<arch>.tar.gz`が生成されます。v0.2.1のmacOS arm64向けアーカイブは`login`や`pdf`を含みます。手動配布の場合は利用者がアーカイブを展開し、そのフォルダで次を実行します。利用者にPython・uv・Gitは不要です。
+`dist/pshift-macos-arm64.tar.gz`が生成されます。手動配布の場合は利用者がアーカイブを展開し、そのフォルダで次を実行します。利用者にPython・uv・Gitは不要です。
 
 ```sh
 sh install-macos.sh
@@ -74,22 +76,22 @@ sh install-macos.sh
 
 アンインストールは`sh "$HOME/.local/share/papershift/uninstall-macos.sh"`です。インストーラーが追加したPATH行だけを`.zprofile`から削除します。新しいターミナルで変更が反映されます。
 
-**GitHub公開後の一行インストール案：**
+**一行インストール：**
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/med-000/paper-shift/main/scripts/install-online-macos.sh | sh
 ```
 
-オンラインスクリプトはデフォルトで[GitHub Releasesのlatest](https://github.com/med-000/paper-shift/releases/latest)から`pshift-macos-<arch>.tar.gz`を取得します。**v0.2.1のmacOS arm64版には最適化済みのPDF翻訳を収録**しています。Intel Mac向けビルドはまだありません。ローカルで別の配布先を検証するときは`PAPERSHIFT_RELEASE_BASE_URL`で上書きできます。Homebrew対応は後から追加します。
+オンラインスクリプトはデフォルトで[GitHub Releasesのlatest](https://github.com/med-000/paper-shift/releases/latest)からアーカイブを取得します。Intel Mac向けビルドはまだありません。ローカルで別の配布先を検証するときは`PAPERSHIFT_RELEASE_BASE_URL`で上書きできます。
 
-## Windows（未検証）
+## Linux（x86_64）
 
-現時点の検証用PowerShellスクリプトでは、開発側が`scripts/build-windows.ps1`を実行してアーカイブを作り、利用者が展開先で`.\install-windows.ps1`を実行する想定です。ユーザーのアプリ用フォルダに`pshift.exe`をコピーし、ユーザーPATHと現在のPowerShellのPATHを設定します。PowerShellの実行ポリシーによる制限を含め、Windows実機での確認が必要です。
+Ubuntu 22.04のGitHub Actionsで`sh scripts/build-linux.sh`を実行し、`pshift-linux-x86_64.tar.gz`を作成・起動検証します。展開先で`sh install-linux.sh`、または`curl -fsSL https://raw.githubusercontent.com/med-000/paper-shift/main/scripts/install-online-linux.sh | sh`でインストールできます。`~/.local/bin`に配置し、`~/.profile`にPATHを追加します。削除は`sh "$HOME/.local/share/papershift/uninstall-linux.sh"`です。古いglibcの環境や別アーキテクチャは対象外です。
 
-この検証用インストールのアンインストールコマンドは`& "$env:LOCALAPPDATA\Programs\PaperShift\uninstall-windows.ps1"`です。インストーラーが追加した場合にだけユーザーPATHから削除します。Windows実機での動作確認はまだ行っていません。
+## Windows（x64）
 
-一般向けには、**cmdの`curl.exe`でダウンロードして起動できる`.exe`インストーラー**を用意する方針です。PATH設定までインストーラーで行います。現在のPowerShellスクリプト（`install-online-windows.ps1`を含む）は技術検証用で、`.exe`インストーラーは未実装です。
+Windows Server 2022のGitHub Actionsで`scripts/build-windows.ps1`を実行し、`pshift-windows-x64.zip`を作成・起動検証します。PowerShellから`irm https://raw.githubusercontent.com/med-000/paper-shift/main/scripts/install-online-windows.ps1 | iex`で取得できます。ZIPを手動展開した場合は`.\install-windows.ps1`を実行してください。`%LOCALAPPDATA%\Programs\PaperShift`に配置し、ユーザーPATHを設定します。削除は`& "$env:LOCALAPPDATA\Programs\PaperShift\uninstall-windows.ps1"`です。署名付きのGUIインストーラーは未提供です。
 
 ## 配布の完成条件
 
-Windows/macOSのクリーン環境でPython・uv・Gitを別途インストールせず`pshift`を起動できること。実際の翻訳・PDF出力と合わせて確認します。GitHubにソースを公開するだけでは、配布用のビルドやインストールURLは完成しません。
+タグをpushした時点で3 OSのテスト・ビルドとアーカイブ内の`--version`起動確認が完了してから、GitHub ActionsがReleaseに3アーカイブを添付します。実アカウントでのPDF翻訳はmacOSで確認済みであり、Linux・Windowsでも認証と翻訳の実地検証は今後の課題です。

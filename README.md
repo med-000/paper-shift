@@ -2,9 +2,9 @@
 
 **英語論文PDFを、日本語で読めるPDFに。** 元PDFのページ数・図・画像・線画をできるだけ保ちながら、抽出した英文を翻訳して同じページの近い位置に配置するオープンソースのCLIです。生成された日本語は画像ではなく、選択・検索できるPDFテキストです。
 
-> **v0.2.1:** macOS Apple Silicon（arm64）向けに配布。翻訳リクエストの並列化と参考文献の判定を改善しました。Windows・Intel Mac用の実行ファイルはまだありません。テキストを抽出できるPDFが対象で、スキャンPDFのOCRには未対応です。
+> **v0.2.2:** macOS Apple Silicon（arm64）・Linux x86_64・Windows x64向けに配布。Intel Mac用の実行ファイルはまだありません。テキストを抽出できるPDFが対象で、スキャンPDFのOCRには未対応です。
 
-- [インストールと最初の翻訳](#macosapple-siliconで使う)
+- [macOS](#macosapple-siliconで使う) · [Linux](#linux-x86_64で使う) · [Windows](#windows-x64で使う)
 - [ソースからの実行](#ソースから使う)
 - [仕組み・制限](#仕組みと現在の範囲)
 
@@ -36,9 +36,33 @@ pshift logout                        # ローカルの認証情報を削除
 
 アンインストールは`sh "$HOME/.local/share/papershift/uninstall-macos.sh"`で行えます。
 
+## Linux (x86_64) で使う
+
+Python・uv・Gitは不要です。ターミナルでインストールし、新しいログインシェルを開いてください。
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/med-000/paper-shift/main/scripts/install-online-linux.sh | sh
+pshift login
+pshift pdf paper.pdf -o paper-ja.pdf
+```
+
+現在のシェルでPATHを読み直す場合は`. "$HOME/.profile"`、アンインストールは`sh "$HOME/.local/share/papershift/uninstall-linux.sh"`です。配布バイナリはUbuntu 22.04上でビルドします。Linuxディストリビューションによっては互換性が異なります。
+
+## Windows (x64) で使う
+
+PowerShellでインストールします。Python・uv・Gitは不要です。
+
+```powershell
+irm https://raw.githubusercontent.com/med-000/paper-shift/main/scripts/install-online-windows.ps1 | iex
+pshift login
+pshift pdf paper.pdf -o paper-ja.pdf
+```
+
+新しいPowerShellでも`pshift`を実行できます。アンインストールは`& "$env:LOCALAPPDATA\Programs\PaperShift\uninstall-windows.ps1"`です。配布ファイルは`.exe`単体とPowerShellインストーラーを含むZIPです。
+
 ## ソースから使う
 
-macOS・Windowsでは、Python 3.11以降と[uv](https://docs.astral.sh/uv/getting-started/installation/)を用意して、リポジトリのルートから実行できます。Windowsでの実行ファイル配布は未検証です。
+macOS・Linux・Windowsでは、Python 3.11以降と[uv](https://docs.astral.sh/uv/getting-started/installation/)を用意して、リポジトリのルートから実行できます。
 
 ```sh
 uv run pshift login
@@ -55,7 +79,7 @@ headless端末では、ブラウザがある端末で認証した後、保護し
 
 ページ数・ページサイズを保ち、画像と線画は元ページに残します。長い訳文が収まらないブロックは必要に応じて縮小します。参考文献の見出しを検出した場合、その後のページを含め原文のまま残します（参考文献以外の後続セクションも翻訳されません）。著者・所属、投稿情報、小さなヘッダー・脚注などは原文のまま残る場合があります。図中の文字や数式の判定、複雑な段組みの精密な再現、スキャンPDFのOCRにはまだ対応していません。訳文が収まらない場合は不完全なPDFを保存せずに終了します。
 
-認証ファイルはリポジトリ外の`~/.config/papershift/`（macOS）または`%LOCALAPPDATA%\PaperShift\`（Windows）に保存します。`pshift status`は保存済みの認証状態を表示しますが、現在のトークンの有効性は保証しません。
+認証ファイルはリポジトリ外の`~/.config/papershift/`（macOS・Linux）または`%LOCALAPPDATA%\PaperShift\`（Windows）に保存します。`pshift status`は保存済みの認証状態を表示しますが、現在のトークンの有効性は保証しません。
 
 ## 開発・ライセンス
 
