@@ -35,7 +35,7 @@ def _choose_model(models: list[tuple[str, str]], current: str | None) -> str | N
     return questionary.select(
         "モデルを選択してください（↑↓、Enter。検索は入力で絞り込み）",
         choices=choices, default=current if current in {slug for slug, _ in models} else None,
-        use_search_filter=True, use_shortcuts=False,
+        use_search_filter=True, use_shortcuts=False, use_jk_keys=False,
     ).ask()
 
 

@@ -10,6 +10,8 @@ from unittest.mock import patch
 from urllib.error import HTTPError
 from urllib.parse import parse_qs
 
+import questionary
+
 from src import auth, cli, inference
 
 
@@ -156,11 +158,12 @@ class InferenceTests(unittest.TestCase):
         with (
             patch("src.cli.sys.stdin.isatty", return_value=True),
             patch("src.cli.sys.stdout.isatty", return_value=True),
-            patch("src.cli.questionary.select") as picker,
+            patch("src.cli.questionary.select", wraps=questionary.select) as picker,
+            patch("questionary.question.Question.ask", return_value="gpt-test"),
         ):
-            picker.return_value.ask.return_value = "gpt-test"
             self.assertEqual(cli._choose_model([("gpt-test", "Test")], None), "gpt-test")
         self.assertTrue(picker.call_args.kwargs["use_search_filter"])
+        self.assertFalse(picker.call_args.kwargs["use_jk_keys"])
 
 
 if __name__ == "__main__":
