@@ -74,6 +74,28 @@ class InferenceTests(unittest.TestCase):
                 with self.assertRaises(inference.InferenceError):
                     inference.translate("chatgpt", "oauth-test", "gpt-test", "Good results.")
 
+    def test_batch_translation_requires_one_output_per_input(self) -> None:
+        payload = {"translations": ["結果は有意だった。", "研究が必要である。"]}
+        with patch("src.inference.urlopen", return_value=sse(
+            {"type": "response.output_text.delta", "delta": json.dumps(payload, ensure_ascii=False)},
+            {"type": "response.completed"},
+        )) as opened:
+            result = inference.translate_many("chatgpt", "oauth-test", "gpt-test", [
+                "The results were significant.", "More studies are needed.",
+            ])
+        self.assertEqual(result, payload["translations"])
+        request = json.loads(opened.call_args.args[0].data)
+        self.assertFalse(request["store"])
+        self.assertTrue(request["stream"])
+        self.assertEqual(json.loads(request["input"][0]["content"])["texts"][1], "More studies are needed.")
+
+        with patch("src.inference.urlopen", return_value=sse(
+            {"type": "response.output_text.delta", "delta": '{"translations":["一つだけ"]}'},
+            {"type": "response.completed"},
+        )):
+            with self.assertRaisesRegex(inference.InferenceError, "一致しません"):
+                inference.translate_many("chatgpt", "oauth-test", "gpt-test", ["First.", "Second."])
+
     def test_http_inference_failure_keeps_code_and_request_id(self) -> None:
         error = HTTPError(
             inference.RESPONSES_URL, 429, "limited", {"x-request-id": "req-test"},

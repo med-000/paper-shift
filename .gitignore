@@ -22,6 +22,7 @@ pshift.spec
 
 # Local papers and generated PDFs (add public fixtures explicitly with git add -f)
 *.[pP][dD][fF]
+/test/
 
 # Local credentials and environment settings
 .env

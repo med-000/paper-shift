@@ -138,16 +138,7 @@ def _failure(event: dict) -> InferenceError:
     return InferenceError(f"推論が完了しませんでした: {str(code)[:200] if code else event.get('type', 'unknown')}")
 
 
-def translate(method: str, credential: str, model: str, text: str) -> str:
-    if not text.strip() or len(text) > 4000:
-        raise InferenceError("翻訳する英文を1～4000文字で入力してください。")
-    payload = {
-        "model": model,
-        "instructions": "Translate the user's English text into natural Japanese. Output only the translation, without commentary.",
-        "input": [{"role": "user", "content": text}],
-        "store": False,
-        "stream": True,
-    }
+def _complete_text(credential: str, payload: dict) -> str:
     request = Request(
         RESPONSES_URL,
         data=json.dumps(payload).encode("utf-8"),
@@ -189,3 +180,43 @@ def translate(method: str, credential: str, model: str, text: str) -> str:
     except (URLError, TimeoutError, OSError) as error:
         raise InferenceError("推論ストリームが途中で切断されました。") from error
     raise InferenceError("推論ストリームが完了前に終了しました。")
+
+
+def translate(method: str, credential: str, model: str, text: str) -> str:
+    if not text.strip() or len(text) > 4000:
+        raise InferenceError("翻訳する英文を1～4000文字で入力してください。")
+    return _complete_text(credential, {
+        "model": model,
+        "instructions": "Translate the user's English text into natural Japanese. Output only the translation, without commentary.",
+        "input": [{"role": "user", "content": text}],
+        "store": False,
+        "stream": True,
+    })
+
+
+def translate_many(method: str, credential: str, model: str, texts: list[str]) -> list[str]:
+    """Translate ordered PDF fragments in one Responses turn with explicit correspondence."""
+    if not texts or any(not item.strip() for item in texts) or sum(map(len, texts)) > 3500:
+        raise InferenceError("PDFの翻訳領域が長すぎます。")
+    if len(texts) == 1:
+        return [translate(method, credential, model, texts[0])]
+    result = _complete_text(credential, {
+        "model": model,
+        "instructions": (
+            "Translate each string in the input JSON texts array from English into natural Japanese. "
+            "Keep the order and number of items exactly the same. "
+            'Respond with only a valid JSON object: {"translations":["Japanese text", ...]}. '
+            "No markdown or other commentary."
+        ),
+        "input": [{"role": "user", "content": json.dumps({"texts": texts}, ensure_ascii=False)}],
+        "store": False,
+        "stream": True,
+    })
+    try:
+        parsed = json.loads(result)
+    except ValueError as error:
+        raise InferenceError("モデルがPDF翻訳の対応表を返しませんでした。再実行してください。") from error
+    translated = parsed.get("translations") if isinstance(parsed, dict) else None
+    if not isinstance(translated, list) or len(translated) != len(texts) or not all(isinstance(item, str) and item.strip() for item in translated):
+        raise InferenceError("モデルのPDF翻訳結果が元の領域数と一致しません。")
+    return [item.strip() for item in translated]

@@ -2,13 +2,15 @@
 
 import argparse
 from importlib.metadata import version
+from pathlib import Path
 import sys
 
 import questionary
 
 from src.auth import LoginError, import_headless, login, login_api_key, logout
-from src.inference import InferenceError, list_models, select_model, selected_model, translate
+from src.inference import InferenceError, list_models, select_model, selected_model, translate, translate_many
 from src.auth import active_credential
+from src.pdf import PdfError, translate_pdf
 
 
 def _login_method() -> str:
@@ -57,6 +59,10 @@ def main() -> None:
     model_parser.add_argument("--list", action="store_true", help="モデル一覧を表示")
     translate_parser = subcommands.add_parser("translate", help="短い英文を日本語に翻訳")
     translate_parser.add_argument("text", help="翻訳する英文（最大4000文字）")
+    pdf_parser = subcommands.add_parser("pdf", help="英語PDFを日本語PDFに翻訳して保存")
+    pdf_parser.add_argument("source", type=Path, help="元の英語PDF")
+    pdf_parser.add_argument("-o", "--output", type=Path, help="出力先（省略時は元ファイル名-ja.pdf）")
+    pdf_parser.add_argument("--force", action="store_true", help="既存の出力先を上書き")
     login_parser = subcommands.add_parser("login", help="ChatGPTまたはAPI keyで認証")
     login_parser.add_argument(
         "--method", choices=("browser", "headless", "api-key", "manual"),
@@ -67,7 +73,32 @@ def main() -> None:
         help="headless: 手元の端末から安全に転送したcredentials.jsonを取り込む",
     )
     args = parser.parse_args()
-    if args.command == "model":
+    if args.command == "pdf":
+        try:
+            method, credential = active_credential()
+            model = selected_model(method, credential)
+            if not model:
+                model = list_models(method, credential)[0][0]
+                select_model(method, credential, model)
+                print(f"デフォルトモデル: {model}", file=sys.stderr)
+
+            def translate_blocks(texts: list[str]) -> list[str]:
+                current_method, current_credential = active_credential()
+                if current_method != method:
+                    raise PdfError("処理中にログイン方式が変更されました。")
+                return translate_many(current_method, current_credential, model, texts)
+
+            destination = args.output or args.source.with_name(f"{args.source.stem}-ja.pdf")
+            pages, blocks = translate_pdf(
+                args.source, destination, translate_blocks, force=args.force,
+                progress=lambda current, total: print(f"PDF翻訳: {current}/{total}ページ", file=sys.stderr),
+            )
+            print(f"保存しました: {destination}（{pages}ページ・{blocks}テキスト領域）")
+        except KeyboardInterrupt:
+            parser.exit(130, "\nPDF翻訳を中断しました。\n")
+        except (PdfError, LoginError, InferenceError, OSError) as error:
+            parser.exit(1, f"PDF翻訳に失敗しました: {error}\n")
+    elif args.command == "model":
         try:
             method, credential = active_credential()
             models = list_models(method, credential)

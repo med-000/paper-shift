@@ -2,7 +2,7 @@
 
 ## 現在の構成
 
-ソース版には`pshift login`の認証フローがありますが、実アカウントによるログイン成功は未検証です。公開済みのv0.1.0実行ファイルは`--help`と`--version`のみで、PDF翻訳はまだ動きません。`ps`はmacOSの標準コマンドと衝突するため使いません。
+ソース版ではChatGPTプランでの短文翻訳と、合成サンプルの日本語PDF保存まで確認済みです。公開済みのv0.1.0実行ファイルは`--help`と`--version`のみで、PDF翻訳は含みません。`ps`はmacOSの標準コマンドと衝突するため使いません。
 
 ```text
 paper-shift/
@@ -22,12 +22,14 @@ paper-shift/
 │   ├── __init__.py
 │   ├── __main__.py         # python -m src の起動口
 │   ├── cli.py              # pshift コマンドの起動口
-│   └── auth.py             # ChatGPT認証フロー
+│   ├── auth.py             # ChatGPT認証フロー
+│   ├── inference.py        # モデル選択と翻訳
+│   └── pdf.py              # PDFの英文抽出と日本語配置
 ├── docs/
 └── README.md
 ```
 
-認証、PDF抽出、翻訳、PDF生成は技術検証後に`src/`へ追加します。先に空のモジュールや汎用インターフェースは作りません。macOSとWindowsで同じコードが動くよう、ファイルパスには`pathlib`を使用します。
+PDF抽出と生成はPyMuPDF、短文・本文ブロックの翻訳はResponses APIを使います。macOSとWindowsで同じコードが動くよう、ファイルパスには`pathlib`を使用します。
 
 ## ソースから起動する
 
@@ -39,6 +41,7 @@ uv run pshift --version
 uv run pshift login
 uv run pshift status
 uv run pshift translate "The results were significant."
+uv run pshift pdf paper.pdf -o paper-ja.pdf
 uv run pshift model  # 必要ならモデルを変更
 uv run pshift logout
 ```
@@ -49,7 +52,9 @@ uv run pshift logout
 
 モデル未選択のまま`pshift translate "英文"`を実行すると、ログイン中のアカウントのモデル一覧の先頭をデフォルトとして保存し、Responses APIのストリームを完了まで読み取ります。`pshift model`はモデル一覧から矢印キーで選択し直せます。非対話環境では`pshift model --list`と`pshift model <slug>`を使います。ChatGPTプラン利用では`store: false`・`stream: true`を指定します。モデル一覧に出ることと、実際の推論が完了することは別です。
 
-headless端末で`pshift login --method headless`を実行すると、手元の端末で認証して`credentials.json`のみを安全に転送する手順が表示されます。転送後は`pshift login --method headless --from-file <転送したファイル>`で取り込みます。headless端末のホストIDは維持されます。認証ファイルは秘密情報です。認証情報の自動更新は未実装のため、アクセストークンの期限後は再取得が必要です。
+`pshift pdf paper.pdf -o paper-ja.pdf`は元ページ上の英文をブロック単位で抽出し、同じページの近い領域に日本語を置きます。複数ブロックをまとめて翻訳して推論回数を抑えます。出力先省略時は元ファイル名に`-ja`を付けます。出力先が既存なら失敗し、`--force`で上書きできます。ページ数・ページサイズを維持し、画像・線画と参考文献を残します。短すぎるヘッダー・脚注などは元のままです。長い訳文が収まらないときは不完全な出力ファイルを保存せずに終了します。現時点では図・数式を識別して除外する処理や、スキャンPDFのOCRはありません。
+
+headless端末で`pshift login --method headless`を実行すると、手元の端末で認証して`credentials.json`のみを安全に転送する手順が表示されます。転送後は`pshift login --method headless --from-file <転送したファイル>`で取り込みます。headless端末のホストIDは維持されます。認証ファイルは秘密情報です。トークン更新処理は実装済みですが、実アカウントでの更新はまだ未検証です。
 
 ## macOS（arm64で動作確認済み）
 
@@ -59,7 +64,7 @@ PyInstallerでPython込みの単体実行ファイルを作ります。ビルド
 sh scripts/build-macos.sh
 ```
 
-`dist/pshift-macos-<arch>.tar.gz`が生成されます。ソース版からビルドしたアーカイブには`login`が入りますが、実アカウントでの認証は未検証です。GitHub Releaseに添付済みのv0.1.0アーカイブは以前のビルドで、`login`を含みません。手動配布の場合は利用者がアーカイブを展開し、そのフォルダで次を実行します。利用者にPython・uv・Gitは不要です。
+`dist/pshift-macos-<arch>.tar.gz`が生成されます。GitHub Releaseに添付済みのv0.1.0アーカイブは以前のビルドで、`login`や`pdf`を含みません。手動配布の場合は利用者がアーカイブを展開し、そのフォルダで次を実行します。利用者にPython・uv・Gitは不要です。
 
 ```sh
 sh install-macos.sh
