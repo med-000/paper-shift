@@ -35,6 +35,32 @@ class LoginError(Exception):
     """An authentication attempt could not be completed safely."""
 
 
+def status_lines() -> list[str]:
+    """Describe locally saved accounts and the API key on explicit request."""
+    directory = _config_dir()
+    active = _load_json(directory / "active.json")
+    chatgpt = _load_json(directory / "credentials.json")
+    api = _load_json(directory / "api-key.json")
+    has_chatgpt = bool(chatgpt and isinstance(chatgpt.get("subject"), str) and chatgpt["subject"])
+    has_api = bool(api and isinstance(api.get("api_key"), str) and api["api_key"])
+    method = active.get("method") if active else ("chatgpt" if has_chatgpt else "api-key" if has_api else None)
+    if method == "chatgpt" and has_chatgpt:
+        lines = ["現在の認証: ChatGPTプラン"]
+    elif method == "api-key" and has_api:
+        lines = ["現在の認証: OpenAI Platform API key（従量課金）"]
+    else:
+        lines = ["現在の認証: 未ログイン"]
+    if has_chatgpt:
+        email = chatgpt.get("email")
+        label = email if isinstance(email, str) and email else chatgpt["subject"]
+        # Saved display names must not be able to write terminal control sequences.
+        label = "".join(char for char in label if char.isprintable() and char not in "\x1b\x7f")
+        lines.append(f"ChatGPTアカウント: {label}")
+    if has_api:
+        lines.append(f"API key: {api['api_key']}")
+    return lines
+
+
 def _config_dir() -> Path:
     if os.name == "nt":
         return Path(os.environ.get("LOCALAPPDATA", Path.home() / "AppData" / "Local")) / "PaperShift"

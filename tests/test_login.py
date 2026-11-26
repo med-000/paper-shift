@@ -152,15 +152,46 @@ class LoginTests(unittest.TestCase):
         self.assertIn("127.0.0.1", output.getvalue())
 
     def test_interactive_method_selection(self) -> None:
-        with patch("src.cli.sys.stdin.isatty", return_value=True):
-            with patch("builtins.input", side_effect=["invalid", "2"]):
-                self.assertEqual(cli._login_method(), "headless")
-            with patch("builtins.input", return_value="3"):
-                self.assertEqual(cli._login_method(), "api-key")
-            with patch("builtins.input", return_value=""):
-                self.assertEqual(cli._login_method(), "browser")
+        with (
+            patch("src.cli.sys.stdin.isatty", return_value=True),
+            patch("src.cli.sys.stdout.isatty", return_value=True),
+            patch("src.cli.questionary.select") as select,
+        ):
+            for method in ("browser", "headless", "api-key"):
+                select.return_value.ask.return_value = method
+                self.assertEqual(cli._login_method(), method)
+            self.assertEqual([choice.value for choice in select.call_args.kwargs["choices"]],
+                             ["browser", "headless", "api-key"])
+            select.return_value.ask.return_value = None
+            with self.assertRaises(KeyboardInterrupt):
+                cli._login_method()
         with patch("src.cli.sys.stdin.isatty", return_value=False):
             self.assertEqual(cli._login_method(), "browser")
+
+    def test_status_shows_active_account_and_api_key_but_not_oauth_tokens(self) -> None:
+        with patch("src.auth._config_dir", return_value=self.directory):
+            self.assertEqual(auth.status_lines(), ["現在の認証: 未ログイン"])
+            auth._save_json(self.directory / "credentials.json", {
+                "subject": "test-subject", "email": "user@example.com", "access_token": "secret-access",
+                "refresh_token": "secret-refresh", "id_token": "secret-id",
+            })
+            auth._save_json(self.directory / "api-key.json", {"api_key": "sk-secret-key"})
+            auth._save_json(self.directory / "active.json", {"method": "chatgpt"})
+            chatgpt_status = "\n".join(auth.status_lines())
+            self.assertIn("現在の認証: ChatGPTプラン", chatgpt_status)
+            self.assertIn("user@example.com", chatgpt_status)
+            self.assertIn("API key: sk-secret-key", chatgpt_status)
+            self.assertNotIn("secret-access", chatgpt_status)
+            self.assertNotIn("secret-refresh", chatgpt_status)
+            self.assertNotIn("secret-id", chatgpt_status)
+            auth._save_json(self.directory / "active.json", {"method": "api-key"})
+            api_status = "\n".join(auth.status_lines())
+            self.assertIn("現在の認証: OpenAI Platform API key", api_status)
+            self.assertIn("user@example.com", api_status)
+            self.assertIn("API key: sk-secret-key", api_status)
+            auth._save_json(self.directory / "active.json", {"method": "chatgpt"})
+            (self.directory / "credentials.json").unlink()
+            self.assertIn("現在の認証: 未ログイン", auth.status_lines())
 
     def test_headless_import_keeps_local_host_id(self) -> None:
         jwk = SimpleNamespace(key=self.key.public_key())

@@ -4,25 +4,26 @@ import argparse
 from importlib.metadata import version
 import sys
 
+import questionary
+
 from src.auth import LoginError, import_headless, login, login_api_key
 
 
 def _login_method() -> str:
-    if not sys.stdin.isatty():
+    if not sys.stdin.isatty() or not sys.stdout.isatty():
         return "browser"
-    print("OpenAIへの認証方法を選択してください:")
-    print("  1. ChatGPT Pro/Plus (browser)")
-    print("  2. ChatGPT Pro/Plus (headless: 別端末で認証して転送)")
-    print("  3. API key (ChatGPTプラン外・従量課金)")
-    while True:
-        choice = input("選択 [1]: ").strip()
-        if choice in ("", "1"):
-            return "browser"
-        if choice == "2":
-            return "headless"
-        if choice == "3":
-            return "api-key"
-        print("1、2、3のいずれかを入力してください。")
+    method = questionary.select(
+        "OpenAIへの認証方法を選択してください（↑↓で選択、Enterで決定）",
+        choices=[
+            questionary.Choice("ChatGPT Pro/Plus (browser)", value="browser"),
+            questionary.Choice("ChatGPT Pro/Plus (headless: 別端末で認証して転送)", value="headless"),
+            questionary.Choice("API key (ChatGPTプラン外・従量課金)", value="api-key"),
+        ],
+        use_shortcuts=False,
+    ).ask()
+    if method is None:
+        raise KeyboardInterrupt
+    return method
 
 
 def main() -> None:
@@ -36,6 +37,7 @@ def main() -> None:
         version=f"%(prog)s {version('paper-shift')}",
     )
     subcommands = parser.add_subparsers(dest="command")
+    subcommands.add_parser("status", help="保存済みの認証状態を表示")
     login_parser = subcommands.add_parser("login", help="ChatGPTまたはAPI keyで認証")
     login_parser.add_argument(
         "--method", choices=("browser", "headless", "api-key", "manual"),
@@ -46,7 +48,15 @@ def main() -> None:
         help="headless: 手元の端末から安全に転送したcredentials.jsonを取り込む",
     )
     args = parser.parse_args()
-    if args.command == "login":
+    if args.command == "status":
+        from src.auth import status_lines
+
+        try:
+            for line in status_lines():
+                print(line)
+        except (LoginError, OSError) as error:
+            parser.exit(1, f"認証状態を確認できませんでした: {error}\n")
+    elif args.command == "login":
         try:
             method = args.method or _login_method()
             if args.from_file and method != "headless":

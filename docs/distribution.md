@@ -37,9 +37,10 @@ paper-shift/
 uv run pshift --help
 uv run pshift --version
 uv run pshift login
+uv run pshift status
 ```
 
-`pshift login`は対話式でChatGPTブラウザ認証、headless端末への認証情報の取り込み、OpenAI Platform API keyを選べます。`--method browser`、`--method headless`、`--method api-key`でも指定できます。従来のURL手動表示は`--method manual`で利用できますが、headless認証とは異なります。API keyによる推論はChatGPTプランではなく従量課金です。
+`pshift login`は矢印キーとEnterでChatGPTブラウザ認証、headless端末への認証情報の取り込み、OpenAI Platform API keyを選べます。`--method browser`、`--method headless`、`--method api-key`でも指定できます。従来のURL手動表示は`--method manual`で利用できますが、headless認証とは異なります。`pshift status`は保存済みの認証状態、ChatGPTのメールアドレスとAPI keyの値を表示します。ネットワークへは接続せず、現在のトークンの有効性を保証するものではありません。API keyによる推論はChatGPTプランではなく従量課金です。
 
 headless端末で`pshift login --method headless`を実行すると、手元の端末で認証して`credentials.json`のみを安全に転送する手順が表示されます。転送後は`pshift login --method headless --from-file <転送したファイル>`で取り込みます。headless端末のホストIDは維持されます。認証ファイルは秘密情報です。認証情報の自動更新は未実装のため、アクセストークンの期限後は再取得が必要です。
 
