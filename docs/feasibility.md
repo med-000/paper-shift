@@ -10,7 +10,7 @@ OpenAIはオープンソース・ローカル実行アプリ向けに、ユー�
 
 **Phase 0の判定条件：** 公式フローでローカル認証とトークン更新を行い、固定英文を承認済みChatGPTプランで翻訳できること。アクセストークンの取得だけでなく推論完了を確認します。資格・利用制限・OSSとしての公開条件も調べます。開発者負担のAI API課金、非公開API、セッションCookieの流用で代替しません。
 
-`pshift login`の初回・再認証フローとstate検証はローカルの模擬応答で確認済みです。実際のアカウントでのログイン、トークン更新、固定英文の推論はまだ検証していません。
+`pshift login`の初回・再認証フローとstate検証、モデル一覧取得、トークン更新、短文翻訳の`response.completed`判定はローカルの模擬応答で確認済みです。実際のアカウントでのログイン・トークン更新・推論はまだ検証していません。`pshift model`の表示は推論の利用可否を保証しません。実アカウントで`pshift translate "The results were significant."`が完了することをPhase 0で確認します。
 
 ログイン時はブラウザ認証、headless端末への[保護した認証情報の転送](https://developers.openai.com/siwc/token-sharing-open-source/self-hosted-vms)、OpenAI Platform API keyを選べます。[Codex CLIのデバイスコード認証](https://developers.openai.com/codex/auth#login-on-headless-devices)はCodex向けで、PaperShiftの[OSS向け直接認証手順](https://developers.openai.com/siwc/token-sharing-open-source/sign-in)にはデバイスコードの利用方法が示されていないため、ワンタイムコード方式は未対応です。API keyはChatGPTプランではなく別の従量課金です。API keyの有効性はモデル一覧APIで確認しますが、特定モデルの利用可否や推論完了は別途検証が必要です。
 

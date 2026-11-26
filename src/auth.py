@@ -19,6 +19,7 @@ import uuid
 import webbrowser
 
 import jwt
+from filelock import FileLock, Timeout as LockTimeout
 
 
 ISSUER = "https://auth.openai.com"
@@ -90,6 +91,16 @@ def _revoke_refresh_token(client_id: str, refresh_token: str) -> bool:
 def logout() -> list[str]:
     """End the renewable session and remove both locally stored login methods."""
     directory = _config_dir()
+    if not directory.exists():
+        return ["ログイン情報はありません。"]
+    try:
+        with FileLock(str(directory / "auth.lock"), timeout=10):
+            return _logout_locked(directory)
+    except LockTimeout as error:
+        raise LoginError("認証情報の更新が進行中です。しばらくしてから再試行してください。") from error
+
+
+def _logout_locked(directory: Path) -> list[str]:
     credentials = _load_json(directory / "credentials.json")
     api = _load_json(directory / "api-key.json")
     if credentials is None and api is None:
@@ -152,6 +163,91 @@ def _load_json(path: Path) -> dict | None:
     if not isinstance(value, dict):
         raise LoginError(f"保存済みの認証情報が不正です: {path}")
     return value
+
+
+def active_credential() -> tuple[str, str]:
+    """Return the selected credential, refreshing ChatGPT tokens when necessary."""
+    directory = _config_dir()
+    active = _load_json(directory / "active.json")
+    method = active.get("method") if active else None
+    if method == "api-key":
+        saved = _load_json(directory / "api-key.json")
+        key = saved.get("api_key") if saved else None
+        if not isinstance(key, str) or not key:
+            raise LoginError("API keyが見つかりません。pshift loginを実行してください。")
+        return method, key
+    if method != "chatgpt":
+        raise LoginError("ログインしていません。pshift loginを実行してください。")
+
+    directory.mkdir(mode=0o700, parents=True, exist_ok=True)
+    try:
+        with FileLock(str(directory / "auth.lock"), timeout=10):
+            path = directory / "credentials.json"
+            saved = _load_json(path)
+            if not saved or not isinstance(saved.get("access_token"), str) or not saved["access_token"]:
+                raise LoginError("ChatGPT認証情報が見つかりません。pshift loginを実行してください。")
+            scopes = saved.get("scopes")
+            if not isinstance(scopes, list) or "chatgpt.tokens.use.direct" not in scopes:
+                raise LoginError("ChatGPTプラン利用の権限がありません。pshift loginを実行してください。")
+            try:
+                expires_at = datetime.fromisoformat(saved["saved_at"]).timestamp() + int(saved["expires_in"])
+            except (KeyError, TypeError, ValueError, OverflowError):
+                expires_at = 0
+            if time.time() + 60 >= expires_at:
+                saved = _refresh_credentials(path, saved)
+            return method, saved["access_token"]
+    except LockTimeout as error:
+        raise LoginError("認証情報の更新が進行中です。しばらくしてから再試行してください。") from error
+
+
+def _refresh_credentials(path: Path, saved: dict) -> dict:
+    client_id = saved.get("client_id")
+    refresh_token = saved.get("refresh_token")
+    if not isinstance(client_id, str) or not CLIENT_ID_PATTERN.fullmatch(client_id) or not isinstance(refresh_token, str) or not refresh_token:
+        raise LoginError("更新に必要な認証情報がありません。pshift loginを実行してください。")
+    request = Request(
+        TOKEN_URL,
+        data=urlencode({
+            "grant_type": "refresh_token", "client_id": client_id,
+            "refresh_token": refresh_token, "resource": RESOURCE,
+        }).encode("utf-8"),
+        headers={"Content-Type": "application/x-www-form-urlencoded", "Accept": "application/json"},
+        method="POST",
+    )
+    try:
+        with urlopen(request, timeout=20) as response:
+            renewed = json.load(response)
+    except HTTPError as error:
+        if error.code == 400:
+            try:
+                code = json.load(error).get("error")
+            except (ValueError, AttributeError):
+                code = None
+            if code in ("invalid_grant", "invalid_refresh_token", "refresh_token_expired", "refresh_token_invalidated", "refresh_token_reused"):
+                _save_json(path.parent / "registration.json", {
+                    "client_id": client_id, "subject": saved.get("subject"), "email": saved.get("email"),
+                })
+                path.unlink(missing_ok=True)
+                raise LoginError("ChatGPTのセッションが失効しました。pshift loginを再実行してください。") from error
+        raise LoginError(f"ChatGPTトークンの更新に失敗しました (HTTP {error.code})。") from error
+    except (URLError, TimeoutError, ValueError) as error:
+        raise LoginError("ChatGPTトークンの更新中に通信エラーが発生しました。") from error
+    if not isinstance(renewed, dict) or not all(isinstance(renewed.get(k), str) and renewed[k] for k in ("access_token", "refresh_token")):
+        raise LoginError("ChatGPTのトークン更新応答が不正です。")
+    if not isinstance(renewed.get("token_type"), str) or renewed["token_type"].lower() != "bearer":
+        raise LoginError("ChatGPTのトークン形式が不正です。")
+    scopes = renewed.get("scope")
+    if not isinstance(scopes, str) or not {"resource.invoke", "chatgpt.tokens.use.direct"}.issubset(scopes.split()):
+        raise LoginError("ChatGPTプラン利用の権限がありません。pshift loginを再実行してください。")
+    lifetime = renewed.get("expires_in")
+    if not isinstance(lifetime, int) or lifetime <= 0:
+        raise LoginError("ChatGPTの有効期限が不正です。")
+    saved.update(
+        access_token=renewed["access_token"], refresh_token=renewed["refresh_token"],
+        expires_in=lifetime, scopes=scopes.split(), saved_at=datetime.now(timezone.utc).isoformat(),
+    )
+    _save_json(path, saved)
+    return saved
 
 
 def _host_id(directory: Path) -> str:

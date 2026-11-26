@@ -7,6 +7,8 @@ import sys
 import questionary
 
 from src.auth import LoginError, import_headless, login, login_api_key, logout
+from src.inference import InferenceError, list_models, select_model, selected_model, translate
+from src.auth import active_credential
 
 
 def _login_method() -> str:
@@ -26,6 +28,17 @@ def _login_method() -> str:
     return method
 
 
+def _choose_model(models: list[tuple[str, str]], current: str | None) -> str | None:
+    if not sys.stdin.isatty() or not sys.stdout.isatty():
+        return None
+    choices = [questionary.Choice(f"{name} ({slug})" if name != slug else slug, value=slug) for slug, name in models]
+    return questionary.select(
+        "モデルを選択してください（↑↓、Enter。検索は入力で絞り込み）",
+        choices=choices, default=current if current in {slug for slug, _ in models} else None,
+        use_search_filter=True, use_shortcuts=False,
+    ).ask()
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         prog="pshift",
@@ -39,6 +52,11 @@ def main() -> None:
     subcommands = parser.add_subparsers(dest="command")
     subcommands.add_parser("status", help="保存済みの認証状態を表示")
     subcommands.add_parser("logout", help="保存済みの認証情報を削除")
+    model_parser = subcommands.add_parser("model", help="利用可能なモデルを選択")
+    model_parser.add_argument("slug", nargs="?", help="対話操作せずモデル名で選択")
+    model_parser.add_argument("--list", action="store_true", help="モデル一覧を表示")
+    translate_parser = subcommands.add_parser("translate", help="短い英文を日本語に翻訳")
+    translate_parser.add_argument("text", help="翻訳する英文（最大4000文字）")
     login_parser = subcommands.add_parser("login", help="ChatGPTまたはAPI keyで認証")
     login_parser.add_argument(
         "--method", choices=("browser", "headless", "api-key", "manual"),
@@ -49,7 +67,44 @@ def main() -> None:
         help="headless: 手元の端末から安全に転送したcredentials.jsonを取り込む",
     )
     args = parser.parse_args()
-    if args.command == "logout":
+    if args.command == "model":
+        try:
+            method, credential = active_credential()
+            models = list_models(method, credential)
+            current = selected_model(method, credential)
+            if args.slug:
+                if args.slug not in {slug for slug, _ in models}:
+                    raise InferenceError("指定したモデルはこのアカウントの一覧にありません。pshift model --listで確認してください。")
+                choice = args.slug
+            elif args.list or not (sys.stdin.isatty() and sys.stdout.isatty()):
+                for slug, name in models:
+                    marker = "*" if slug == current else " "
+                    print(f"{marker} {name} ({slug})" if name != slug else f"{marker} {slug}")
+                if not args.list:
+                    print("モデルを選ぶには `pshift model <モデル名>` を実行してください。")
+                return
+            else:
+                choice = _choose_model(models, current)
+                if choice is None:
+                    return
+            select_model(method, credential, choice)
+            print(f"選択中のモデル: {choice}")
+        except KeyboardInterrupt:
+            parser.exit(130, "\nモデル選択を中断しました。\n")
+        except (LoginError, InferenceError, OSError) as error:
+            parser.exit(1, f"モデル選択に失敗しました: {error}\n")
+    elif args.command == "translate":
+        try:
+            method, credential = active_credential()
+            model = selected_model(method, credential)
+            if not model:
+                raise InferenceError("モデルが未選択です。先にpshift modelを実行してください。")
+            print(translate(method, credential, model, args.text))
+        except KeyboardInterrupt:
+            parser.exit(130, "\n翻訳を中断しました。\n")
+        except (LoginError, InferenceError, OSError) as error:
+            parser.exit(1, f"翻訳に失敗しました: {error}\n")
+    elif args.command == "logout":
         try:
             for line in logout():
                 print(line)
