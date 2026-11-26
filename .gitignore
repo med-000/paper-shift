@@ -45,3 +45,6 @@ Desktop.ini
 # Temporary output
 *.log
 *.tmp
+
+# Private local release checklist (never commit)
+/docs/relese.md
