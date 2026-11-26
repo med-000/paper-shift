@@ -37,4 +37,4 @@ PyMuPDFの文字除去機能は、指定範囲に重なる画像や線にも影�
 - [Chrome Extensions — `chrome.identity`](https://developer.chrome.com/docs/extensions/reference/api/identity)
 - [Chrome Extensions — `chrome.mimeHandler`](https://developer.chrome.com/docs/extensions/reference/api/mimeHandler)
 
-初期のPDF生成は、PyMuPDFで英語テキスト領域を抽出・削除し、日本語のCJKフォントでおおよそ同じ位置に配置します。元ページを使うため画像・線画とページ数を保てます。実際のChatGPTプラン認証で2ページの合成サンプルに加え、`test/`の7ページの論文を翻訳しました。論文のページ数と各ページの画像・線画の数は元PDFと一致し、57領域の日本語訳を含むPDFを保存できました。参考文献と非常に小さなヘッダー・脚注は原文のままです。図内の文字、数式、複雑な段組み、スキャンPDFの判定や精密な配置は今後の課題です。訳文が収まらない場合は出力せず停止します。
+初期のPDF生成は、PyMuPDFで英語テキスト領域を抽出・削除し、同梱のNoto Sans JP / Noto Serif JPでおおよそ同じ位置に配置します。元のブロックごとの文字サイズと太さを参考にし、必要な箇所のみ縮小します。元ページを使うため画像・線画とページ数を保てます。実際のChatGPTプラン認証で2ページの合成サンプルに加え、`test/`の7ページの論文を翻訳しました。論文のページ数と各ページの画像・線画の数は元PDFと一致し、51領域の日本語訳を含むPDFを保存できました。参考文献、著者・所属、投稿情報と非常に小さなヘッダー・脚注は原文のままです。図内の文字、数式、複雑な段組み、スキャンPDFの判定や精密な配置は今後の課題です。訳文が収まらない場合は出力せず停止します。

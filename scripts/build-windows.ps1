@@ -7,7 +7,8 @@ if (-not $IsWindows -and $env:OS -ne 'Windows_NT') {
 $root = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 Push-Location $root
 try {
-    uv run --with pyinstaller pyinstaller --noconfirm --clean --onefile --name pshift --copy-metadata paper-shift src/__main__.py
+    $fontData = (Join-Path $root 'src/fonts') + ';src/fonts'
+    uv run --with pyinstaller pyinstaller --noconfirm --clean --onefile --name pshift --copy-metadata paper-shift --add-data $fontData src/__main__.py
     if ($LASTEXITCODE -ne 0) { throw 'PyInstallerのビルドに失敗しました。' }
 
     $arch = [System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture.ToString().ToLowerInvariant()

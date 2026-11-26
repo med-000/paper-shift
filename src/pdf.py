@@ -5,12 +5,32 @@ from pathlib import Path
 import re
 import tempfile
 from collections.abc import Callable
+from dataclasses import dataclass
 
 import pymupdf
 
 
 class PdfError(Exception):
     """An input PDF cannot be translated without losing text or layout."""
+
+
+FONT_DIR = Path(__file__).resolve().parent / "fonts"
+FONTS = {
+    "PSans": FONT_DIR / "NotoSansJP-Regular.ttf",
+    "PSansBold": FONT_DIR / "NotoSansJP-Bold.ttf",
+    "PSerif": FONT_DIR / "NotoSerifJP-Regular.ttf",
+}
+
+
+@dataclass(frozen=True)
+class TextBlock:
+    rect: pymupdf.Rect
+    text: str
+    size: float
+    bold: bool
+    serif: bool
+    title: bool
+    heading: bool
 
 
 def _chunks(text: str, max_length: int = 3500) -> list[str]:
@@ -33,41 +53,152 @@ def _chunks(text: str, max_length: int = 3500) -> list[str]:
     return chunks
 
 
-def _text_blocks(page: pymupdf.Page) -> list[tuple[pymupdf.Rect, str]]:
+def _text_blocks(page: pymupdf.Page) -> list[TextBlock]:
     blocks = []
-    for block in page.get_text("blocks", sort=True):
-        if block[6] != 0:
+    for block in page.get_text("dict", sort=True)["blocks"]:
+        if block["type"] != 0:
             continue
-        text = re.sub(r"-\s*\n\s*", "", block[4]).replace("\n", " ").strip()
-        if not text or not re.search(r"[A-Za-z]", text):
+        lines = block["lines"]
+        spans = [span for line in lines for span in line["spans"] if span["text"].strip()]
+        if not spans:
             continue
-        rect = pymupdf.Rect(block[:4]) & page.cropbox
-        # Very thin headers, footers and figure labels often contain dense
-        # metadata that cannot be legibly replaced within the same page.
+        raw = "\n".join("".join(span["text"] for span in line["spans"]) for line in lines)
+        text = re.sub(r"-\s*\n\s*", "", raw).replace("\n", " ").strip()
+        if not re.search(r"[A-Za-z]", text):
+            continue
+        rect = pymupdf.Rect(block["bbox"]) & page.cropbox
         if rect.is_empty or rect.is_infinite or rect.height < 10.5:
             continue
-        blocks.append((rect, text))
+        if page.number == 0 and (
+            (rect.y0 < page.rect.height * 0.25 and "Member, IEEE" in text)
+            or text.startswith("Received ")
+            or "@" in text
+            or text.startswith("This article has supplementary")
+        ):
+            # Preserve names, affiliations and publication metadata verbatim.
+            continue
+        dominant = max(spans, key=lambda span: len(span["text"].strip()))
+        size = float(dominant["size"])
+        title = page.number == 0 and rect.y0 < page.rect.height * 0.25 and size >= 16
+        bold = sum(len(s["text"]) for s in spans if s["flags"] & 16) >= sum(len(s["text"]) for s in spans) / 2
+        heading = not title and bold and len(text) < 110 and (size >= 10 or bool(re.match(r"^[IVX]+\.\s+[A-Z]", text)))
+        font = dominant["font"].lower()
+        serif = any(name in font for name in ("times", "serif", "roman", "mincho"))
+        blocks.append(TextBlock(rect, text, size, bold, serif, title, heading))
     return blocks
 
 
-def _placement(page: pymupdf.Page, blocks: list[tuple[pymupdf.Rect, str]], obstacles: list[pymupdf.Rect], index: int) -> pymupdf.Rect:
-    source = blocks[index][0]
-    bottom = page.cropbox.y1 - 12
-    for other in obstacles:
-        if other.y0 < source.y1 - 1 or other == source:
-            continue
-        overlap = min(source.x1, other.x1) - max(source.x0, other.x0)
-        if overlap > min(source.width, other.width) * 0.3:
-            bottom = min(bottom, other.y0 - 2)
-    return pymupdf.Rect(source.x0, source.y0, source.x1, max(source.y1, bottom))
+def _register_fonts(page: pymupdf.Page) -> None:
+    for name, path in FONTS.items():
+        if not path.is_file():
+            raise PdfError(f"日本語フォントがありません: {path.name}")
+        page.insert_font(fontname=name, fontfile=str(path))
 
 
-def _insert_translation(page: pymupdf.Page, area: pymupdf.Rect, text: str, page_number: int, block_number: int) -> None:
-    for size in (10.5, 9.5, 8.5, 7.5, 6.5, 5.5, 5.0):
-        remaining = page.insert_textbox(area, text, fontsize=size, fontname="japan", lineheight=1.2)
-        if remaining >= 0:
-            return
-    raise PdfError(f"{page_number}ページ目の{block_number}番目の訳文が収まりません（領域{area.width:.0f}×{area.height:.0f}pt、訳文{len(text)}文字）。")
+def _style(block: TextBlock, scale: float) -> tuple[str, float]:
+    size = block.size * scale
+    if block.title or block.heading:
+        return "PSansBold", size
+    if block.bold:
+        return "PSansBold", size
+    return ("PSerif" if block.serif else "PSans"), size
+
+
+def _lane(rect: pymupdf.Rect, page: pymupdf.Page) -> str:
+    if rect.width > page.cropbox.width * 0.65:
+        return "full"
+    return "left" if (rect.x0 + rect.x1) / 2 < (page.cropbox.x0 + page.cropbox.x1) / 2 else "right"
+
+
+def _overlaps_horizontally(a: pymupdf.Rect, b: pymupdf.Rect) -> bool:
+    return min(a.x1, b.x1) - max(a.x0, b.x0) > min(a.width, b.width) * 0.3
+
+
+def _layout(
+    canvas: pymupdf.Page, blocks: list[TextBlock], translations: list[str], obstacles: list[pymupdf.Rect],
+    scales: list[float],
+) -> tuple[list[tuple[pymupdf.Rect, str, str, float]] | None, int | None]:
+    cursor = {"full": 0.0, "left": 0.0, "right": 0.0}
+    placements = []
+    for index, (block, text, scale) in enumerate(zip(blocks, translations, scales, strict=True)):
+        lane = _lane(block.rect, canvas)
+        start = max(block.rect.y0, cursor[lane], cursor["full"])
+        if lane == "full":
+            start = max(start, cursor["left"], cursor["right"])
+        for obstacle in obstacles:
+            if _overlaps_horizontally(block.rect, obstacle) and obstacle.y0 <= start < obstacle.y1:
+                start = obstacle.y1 + 2
+        bottom = canvas.cropbox.y1 - 12
+        if block.title:
+            for following in blocks:
+                if following.rect.y0 > block.rect.y0 + 1 and _overlaps_horizontally(block.rect, following.rect):
+                    bottom = min(bottom, following.rect.y0 - 2)
+        for obstacle in obstacles:
+            if obstacle.y0 > start + 1 and _overlaps_horizontally(block.rect, obstacle):
+                bottom = min(bottom, obstacle.y0 - 2)
+        if start >= bottom:
+            return None, index
+        right = max(block.rect.x1, canvas.cropbox.x1 - block.rect.x0) if block.title else block.rect.x1
+        area = pymupdf.Rect(block.rect.x0, start, right, bottom)
+        font, size = _style(block, scale)
+        remaining = canvas.insert_textbox(area, text, fontname=font, fontsize=size, lineheight=1.2)
+        if remaining < 0:
+            return None, index
+        visible = [pymupdf.Rect(span["bbox"])
+                   for rendered in canvas.get_text("dict")["blocks"] if rendered["type"] == 0
+                   for line in rendered["lines"] for span in line["spans"]
+                   if span["bbox"][1] >= start - 1
+                   and (pymupdf.Rect(span["bbox"]) & area).width >= pymupdf.Rect(span["bbox"]).width * 0.8]
+        if not visible:
+            return None, index
+        bounds = visible[0]
+        for other in visible[1:]:
+            bounds |= other
+        if bounds.y1 > bottom - 1 or any((bounds & obstacle).get_area() > 1 for obstacle in obstacles):
+            return None, index
+        used_bottom = bounds.y1 + 2
+        if lane == "full":
+            cursor = {key: used_bottom for key in cursor}
+        else:
+            cursor[lane] = used_bottom
+        placements.append((area, text, font, size))
+    return placements, None
+
+
+def _choose_layout(page: pymupdf.Page, blocks: list[TextBlock], translations: list[str], obstacles: list[pymupdf.Rect]) -> list[tuple[pymupdf.Rect, str, str, float]]:
+    def attempt(scales: list[float]) -> tuple[list[tuple[pymupdf.Rect, str, str, float]] | None, int | None]:
+        with pymupdf.open() as preview:
+            canvas = preview.new_page(width=page.rect.width, height=page.rect.height)
+            _register_fonts(canvas)
+            return _layout(canvas, blocks, translations, obstacles, scales)
+
+    # Start from the exact extracted sizes. Shrink only the block that fails;
+    # if it is already at the limit, make room by shrinking an earlier block.
+    scales = [1.0] * len(blocks)
+    for _ in range(len(blocks) * 12):
+        placements, failed = attempt(scales)
+        if placements is not None:
+            return placements
+        assert failed is not None
+        candidates = [failed] + [index for index in range(failed - 1, -1, -1)
+                                 if _overlaps_horizontally(blocks[index].rect, blocks[failed].rect)]
+        target = next((index for index in candidates if scales[index] > 0.61), None)
+        if target is None:
+            break
+        next_scale = round(scales[target] - 0.05, 2)
+        if blocks[target].title:
+            for index, block in enumerate(blocks):
+                if block.title:
+                    scales[index] = min(scales[index], next_scale)
+        else:
+            scales[target] = next_scale
+
+    # A shared reduction can still succeed when many small adjustments interact.
+    for scale in (0.9, 0.8, 0.7, 0.6):
+        placements, _ = attempt([scale] * len(blocks))
+        if placements is not None:
+            return placements
+    raise PdfError(f"{page.number + 1}ページ目の訳文を元の文字サイズ比率のまま配置できませんでした。")
 
 
 def translate_pdf(
@@ -97,19 +228,18 @@ def translate_pdf(
         in_references = False
         for number, page in enumerate(document, start=1):
             raw_blocks = [block for block in page.get_text("blocks") if block[6] == 0]
-            obstacles = [pymupdf.Rect(block[:4]) for block in raw_blocks]
             headings = [pymupdf.Rect(block[:4]).y0 for block in raw_blocks
                         if block[4].strip().lower() in ("references", "bibliography")]
             reference_start = min(headings) if headings else None
             blocks = [] if in_references else _text_blocks(page)
             if reference_start is not None:
-                blocks = [(rect, text) for rect, text in blocks if rect.y0 < reference_start]
+                blocks = [block for block in blocks if block.rect.y0 < reference_start]
                 in_references = True
             if not blocks:
                 if progress:
                     progress(number, document.page_count)
                 continue
-            fragments = [(index, fragment) for index, (_, text) in enumerate(blocks) for fragment in _chunks(text)]
+            fragments = [(index, fragment) for index, block in enumerate(blocks) for fragment in _chunks(block.text)]
             translations = [[] for _ in blocks]
             processed = 0
             while processed < len(fragments):
@@ -126,11 +256,18 @@ def translate_pdf(
                 for (index, _), result in zip(batch, results):
                     translations[index].append(result.strip())
                 processed += len(batch)
-            for rect, _ in blocks:
-                page.add_redact_annot(rect, fill=False, cross_out=False)
+            # Only text that stays in the original PDF acts as a fixed obstacle.
+            obstacles = [pymupdf.Rect(raw[:4]) for raw in raw_blocks
+                         if not any((pymupdf.Rect(raw[:4]) & block.rect).get_area() >= block.rect.get_area() * 0.9
+                                    for block in blocks)]
+            layout = _choose_layout(page, blocks, ["".join(parts) for parts in translations], obstacles)
+            for block in blocks:
+                page.add_redact_annot(block.rect, fill=False, cross_out=False)
             page.apply_redactions(images=0, graphics=0, text=0)
-            for index, result in enumerate(translations):
-                _insert_translation(page, _placement(page, blocks, obstacles, index), "".join(result), number, index + 1)
+            _register_fonts(page)
+            for area, text, font, size in layout:
+                if page.insert_textbox(area, text, fontname=font, fontsize=size, lineheight=1.2) < 0:
+                    raise PdfError(f"{number}ページ目の訳文を配置できませんでした。")
                 translated += 1
             if progress:
                 progress(number, document.page_count)
@@ -142,6 +279,7 @@ def translate_pdf(
             fd, path = tempfile.mkstemp(prefix=".pshift-", suffix=".pdf", dir=destination.parent)
             os.close(fd)
             temporary = Path(path)
+            document.subset_fonts()
             document.save(temporary, garbage=4, deflate=True)
             os.replace(temporary, destination)
         finally:

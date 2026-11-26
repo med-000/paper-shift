@@ -15,6 +15,7 @@ uv run --with pyinstaller pyinstaller \
     --onefile \
     --name pshift \
     --copy-metadata paper-shift \
+    --add-data "$ROOT/src/fonts:src/fonts" \
     src/__main__.py
 
 ARCH=$(uname -m)

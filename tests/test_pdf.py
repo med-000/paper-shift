@@ -124,6 +124,34 @@ class PdfTests(unittest.TestCase):
             self.assertTrue(japanese)
             self.assertLess(japanese[-1].y1, page.search_for("JOURNAL")[0].y0)
 
+    def test_original_block_sizes_and_weights_are_preserved_when_they_fit(self) -> None:
+        with pymupdf.open() as doc:
+            page = doc.new_page(width=500, height=650)
+            page.insert_text((40, 75), "A Scientific Study", fontname="hebo", fontsize=21)
+            page.insert_text((40, 125), "Haneen Example, Member, IEEE, Joseph Example", fontsize=11)
+            page.insert_text((40, 205), "Abstract. The first result was significant.", fontname="hebo", fontsize=9)
+            page.insert_text((40, 305), "The explanatory note is smaller.", fontname="tiro", fontsize=8)
+            page.insert_text((40, 405), "The main body has its own size.", fontname="tiro", fontsize=10)
+            doc.save(self.source)
+        translator = Mock(return_value=["日本語の科学的研究", "要旨：結果は有意だった。", "補足の説明。", "本文は別の大きさ。"])
+        self.assertEqual(translate_pdf(self.source, self.output, translator), (1, 4))
+        with pymupdf.open(self.output) as doc:
+            page = doc[0]
+            self.assertIn("Haneen Example", page.get_text())
+            spans = [span for block in page.get_text("dict")["blocks"] if block["type"] == 0
+                     for line in block["lines"] for span in line["spans"]]
+            def matching(needle: str) -> dict:
+                return next(span for span in spans if needle in span["text"])
+            title = matching("日本語の科学的研究")
+            abstract = matching("要旨")
+            note = matching("補足")
+            body = matching("本文は")
+            self.assertIn("Noto Sans JP Bold", title["font"])
+            self.assertIn("Noto Sans JP Bold", abstract["font"])
+            self.assertIn("Noto Serif JP Regular", note["font"])
+            self.assertEqual([round(s["size"]) for s in (title, abstract, note, body)], [21, 9, 8, 10])
+            self.assertLess(page.search_for("日本語の科学的研究")[0].y1, page.search_for("Haneen Example")[0].y0)
+
 
 if __name__ == "__main__":
     unittest.main()
