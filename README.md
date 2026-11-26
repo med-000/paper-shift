@@ -2,9 +2,9 @@
 
 **英語論文PDFを、日本語で読めるPDFに。** 元PDFのページ数・図・画像・線画をできるだけ保ちながら、抽出した英文を翻訳して同じページの近い位置に配置するオープンソースのCLIです。生成された日本語は画像ではなく、選択・検索できるPDFテキストです。
 
-> **v0.2.2:** macOS Apple Silicon（arm64）・Linux x86_64・Windows x64向けに配布。Intel Mac用の実行ファイルはまだありません。テキストを抽出できるPDFが対象で、スキャンPDFのOCRには未対応です。
+> **v0.2.2:** macOS Apple Silicon（arm64）・Linux x86_64向けに配布。Windows・Intel Mac用の実行ファイルはまだありません。テキストを抽出できるPDFが対象で、スキャンPDFのOCRには未対応です。
 
-- [macOS](#macosapple-siliconで使う) · [Linux](#linux-x86_64で使う) · [Windows](#windows-x64で使う)
+- [macOS](#macosapple-siliconで使う) · [Linux](#linux-x86_64で使う)
 - [ソースからの実行](#ソースから使う)
 - [仕組み・制限](#仕組みと現在の範囲)
 
@@ -38,31 +38,22 @@ pshift logout                        # ローカルの認証情報を削除
 
 ## Linux (x86_64) で使う
 
-Python・uv・Gitは不要です。ターミナルでインストールし、新しいログインシェルを開いてください。
+Python・uv・Gitは不要です。ターミナルでインストールし、新しいログインシェルを開いてからログイン・翻訳してください。
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/med-000/paper-shift/main/scripts/install-online-linux.sh | sh
+```
+
+```sh
 pshift login
 pshift pdf paper.pdf -o paper-ja.pdf
 ```
 
-現在のシェルでPATHを読み直す場合は`. "$HOME/.profile"`、アンインストールは`sh "$HOME/.local/share/papershift/uninstall-linux.sh"`です。配布バイナリはUbuntu 22.04上でビルドします。Linuxディストリビューションによっては互換性が異なります。
-
-## Windows (x64) で使う
-
-PowerShellでインストールします。Python・uv・Gitは不要です。
-
-```powershell
-irm https://raw.githubusercontent.com/med-000/paper-shift/main/scripts/install-online-windows.ps1 | iex
-pshift login
-pshift pdf paper.pdf -o paper-ja.pdf
-```
-
-新しいPowerShellでも`pshift`を実行できます。アンインストールは`& "$env:LOCALAPPDATA\Programs\PaperShift\uninstall-windows.ps1"`です。配布ファイルは`.exe`単体とPowerShellインストーラーを含むZIPです。
+現在のシェルでPATHを読み直す場合は`. "$HOME/.profile"`、アンインストールは`sh "$HOME/.local/share/papershift/uninstall-linux.sh"`です。配布バイナリはDebian 12（glibc 2.36）環境でビルドしています。古いglibcのディストリビューションでは動作しない場合があります。
 
 ## ソースから使う
 
-macOS・Linux・Windowsでは、Python 3.11以降と[uv](https://docs.astral.sh/uv/getting-started/installation/)を用意して、リポジトリのルートから実行できます。
+macOS・Linuxでは、Python 3.11以降と[uv](https://docs.astral.sh/uv/getting-started/installation/)を用意して、リポジトリのルートから実行できます。Windowsはソース版の検証段階で、v0.2.2の配布対象ではありません。
 
 ```sh
 uv run pshift login

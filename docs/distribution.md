@@ -2,7 +2,7 @@
 
 ## 現在の構成
 
-ソース版ではChatGPTプランでの短文翻訳と、実論文の日本語PDF保存を確認済みです。v0.2.2はmacOS arm64・Linux x86_64・Windows x64向けに認証・モデル選択・PDF翻訳を配布します。Intel Macは対象外です。`ps`はmacOSの標準コマンドと衝突するため使いません。
+ソース版ではChatGPTプランでの短文翻訳と、実論文の日本語PDF保存を確認済みです。v0.2.2はmacOS arm64・Linux x86_64向けに認証・モデル選択・PDF翻訳を配布します。Windows・Intel Macは対象外です。`ps`はmacOSの標準コマンドと衝突するため使いません。
 
 ```text
 paper-shift/
@@ -86,12 +86,12 @@ curl -fsSL https://raw.githubusercontent.com/med-000/paper-shift/main/scripts/in
 
 ## Linux（x86_64）
 
-Ubuntu 22.04のGitHub Actionsで`sh scripts/build-linux.sh`を実行し、`pshift-linux-x86_64.tar.gz`を作成・起動検証します。展開先で`sh install-linux.sh`、または`curl -fsSL https://raw.githubusercontent.com/med-000/paper-shift/main/scripts/install-online-linux.sh | sh`でインストールできます。`~/.local/bin`に配置し、`~/.profile`にPATHを追加します。削除は`sh "$HOME/.local/share/papershift/uninstall-linux.sh"`です。古いglibcの環境や別アーキテクチャは対象外です。
+Linux x86_64環境で`binutils`とuvを用意して`sh scripts/build-linux.sh`を実行し、`pshift-linux-x86_64.tar.gz`を作成します。v0.2.2はDebian 12（glibc 2.36）コンテナでビルド・起動・インストール・削除を確認済みです。展開先で`sh install-linux.sh`、または`curl -fsSL https://raw.githubusercontent.com/med-000/paper-shift/main/scripts/install-online-linux.sh | sh`でインストールできます。`~/.local/bin`に配置し、`~/.profile`にPATHを追加します。削除は`sh "$HOME/.local/share/papershift/uninstall-linux.sh"`です。古いglibcの環境や別アーキテクチャは対象外です。
 
-## Windows（x64）
+## Windows（配布対象外）
 
-Windows Server 2022のGitHub Actionsで`scripts/build-windows.ps1`を実行し、`pshift-windows-x64.zip`を作成・起動検証します。PowerShellから`irm https://raw.githubusercontent.com/med-000/paper-shift/main/scripts/install-online-windows.ps1 | iex`で取得できます。ZIPを手動展開した場合は`.\install-windows.ps1`を実行してください。`%LOCALAPPDATA%\Programs\PaperShift`に配置し、ユーザーPATHを設定します。削除は`& "$env:LOCALAPPDATA\Programs\PaperShift\uninstall-windows.ps1"`です。署名付きのGUIインストーラーは未提供です。
+既存の`scripts/build-windows.ps1`などは技術検証用として残します。v0.2.2にはWindows用のアーカイブを添付せず、インストールURLも提供しません。
 
 ## 配布の完成条件
 
-タグをpushした時点で3 OSのテスト・ビルドとアーカイブ内の`--version`起動確認が完了してから、GitHub ActionsがReleaseに3アーカイブを添付します。実アカウントでのPDF翻訳はmacOSで確認済みであり、Linux・Windowsでも認証と翻訳の実地検証は今後の課題です。
+macOSとLinuxの実行ファイルとインストーラースクリプトを手元でビルド・検証した後、GitHub Releaseに手動で添付します。自動リリースは今後の課題です。実アカウントでのPDF翻訳はmacOSで確認済みであり、Linuxでも認証と翻訳の実地検証は今後の課題です。
