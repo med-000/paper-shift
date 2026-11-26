@@ -98,7 +98,10 @@ def main() -> None:
             method, credential = active_credential()
             model = selected_model(method, credential)
             if not model:
-                raise InferenceError("モデルが未選択です。先にpshift modelを実行してください。")
+                models = list_models(method, credential)
+                model = models[0][0]
+                select_model(method, credential, model)
+                print(f"デフォルトモデル: {model}", file=sys.stderr)
             print(translate(method, credential, model, args.text))
         except KeyboardInterrupt:
             parser.exit(130, "\n翻訳を中断しました。\n")

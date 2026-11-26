@@ -38,8 +38,8 @@ uv run pshift --help
 uv run pshift --version
 uv run pshift login
 uv run pshift status
-uv run pshift model
 uv run pshift translate "The results were significant."
+uv run pshift model  # 必要ならモデルを変更
 uv run pshift logout
 ```
 
@@ -47,7 +47,7 @@ uv run pshift logout
 
 `pshift logout`は保存済みのChatGPT認証とAPI keyの両方をローカルから削除します。ChatGPTの更新トークンは公式の失効エンドポイントで失効を試みます。失効を確認できなかったときもローカルから削除し、メッセージを表示します。次回の認証に備えてクライアントIDとホストIDは保持します。API key自体をOpenAI Platformで無効化するわけではありません。
 
-`pshift model`はログイン中のアカウント向けモデル一覧から矢印キーで選択し、保存します。非対話環境では`pshift model --list`と`pshift model <slug>`を使います。`pshift translate "英文"`は選択したモデルでResponses APIのストリームを完了まで読み取り、日本語訳だけを表示します。ChatGPTプラン利用では`store: false`・`stream: true`を指定します。モデル一覧に出ることと、実際の推論が完了することは別です。
+モデル未選択のまま`pshift translate "英文"`を実行すると、ログイン中のアカウントのモデル一覧の先頭をデフォルトとして保存し、Responses APIのストリームを完了まで読み取ります。`pshift model`はモデル一覧から矢印キーで選択し直せます。非対話環境では`pshift model --list`と`pshift model <slug>`を使います。ChatGPTプラン利用では`store: false`・`stream: true`を指定します。モデル一覧に出ることと、実際の推論が完了することは別です。
 
 headless端末で`pshift login --method headless`を実行すると、手元の端末で認証して`credentials.json`のみを安全に転送する手順が表示されます。転送後は`pshift login --method headless --from-file <転送したファイル>`で取り込みます。headless端末のホストIDは維持されます。認証ファイルは秘密情報です。認証情報の自動更新は未実装のため、アクセストークンの期限後は再取得が必要です。
 

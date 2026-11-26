@@ -154,6 +154,28 @@ class InferenceTests(unittest.TestCase):
         self.assertEqual(output.getvalue().strip(), "有意でした。")
         self.assertEqual(json.loads(opened.call_args.args[0].data)["model"], "gpt-test")
 
+    def test_cli_translate_uses_default_then_keeps_selected_model(self) -> None:
+        auth._save_json(self.directory / "credentials.json", {"client_id": "oaiapp_test"})
+        output = io.StringIO()
+        notices = io.StringIO()
+        with (
+            patch("src.auth._config_dir", return_value=self.directory),
+            patch("src.cli.active_credential", return_value=("chatgpt", "oauth-test")),
+            patch("src.cli.list_models", return_value=[("gpt-first", "First"), ("gpt-second", "Second")]) as catalog,
+            patch("src.cli.translate", return_value="有意でした。") as translation,
+            patch("src.cli.sys.argv", ["pshift", "translate", "Significant."]),
+            patch("src.cli.sys.stdout", output),
+            patch("src.cli.sys.stderr", notices),
+        ):
+            cli.main()
+            cli.main()
+        catalog.assert_called_once_with("chatgpt", "oauth-test")
+        self.assertEqual(translation.call_count, 2)
+        translation.assert_called_with("chatgpt", "oauth-test", "gpt-first", "Significant.")
+        self.assertEqual(output.getvalue(), "有意でした。\n有意でした。\n")
+        self.assertEqual(notices.getvalue(), "デフォルトモデル: gpt-first\n")
+        self.assertEqual(json.loads((self.directory / "model.json").read_text())["slug"], "gpt-first")
+
     def test_model_picker_uses_keyboard_choices(self) -> None:
         with (
             patch("src.cli.sys.stdin.isatty", return_value=True),
