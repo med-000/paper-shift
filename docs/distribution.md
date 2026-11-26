@@ -61,7 +61,7 @@ sh install-macos.sh
 curl -fsSL https://raw.githubusercontent.com/med-000/paper-shift/main/scripts/install-online-macos.sh | sh
 ```
 
-オンラインスクリプトはデフォルトで[GitHub Releasesのlatest](https://github.com/med-000/paper-shift/releases/latest)から`pshift-macos-<arch>.tar.gz`を取得します。**リリースアーカイブは未公開**なので、現時点ではこのコマンドでインストールできません。macOS arm64以外のビルドもまだありません。ローカルで別の配布先を検証するときは`PAPERSHIFT_RELEASE_BASE_URL`で上書きできます。Homebrew対応は後から追加します。
+オンラインスクリプトはデフォルトで[GitHub Releasesのlatest](https://github.com/med-000/paper-shift/releases/latest)から`pshift-macos-<arch>.tar.gz`を取得します。**v0.1.0のmacOS arm64版は公開済み**で、一行インストール・起動・アンインストールを確認しました。ただし翻訳機能は未実装です。Intel Mac向けビルドはまだありません。ローカルで別の配布先を検証するときは`PAPERSHIFT_RELEASE_BASE_URL`で上書きできます。Homebrew対応は後から追加します。
 
 ## Windows（未検証）
 
