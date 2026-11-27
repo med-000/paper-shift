@@ -11,6 +11,7 @@ from src.auth import LoginError, import_headless, login, login_api_key, logout
 from src.inference import InferenceError, list_models, select_model, selected_model, translate, translate_many
 from src.auth import active_credential
 from src.pdf import PdfError, translate_pdf
+from src.update import UpdateError, update
 
 
 def _login_method() -> str:
@@ -54,6 +55,8 @@ def main() -> None:
     subcommands = parser.add_subparsers(dest="command")
     subcommands.add_parser("status", help="保存済みの認証状態を表示")
     subcommands.add_parser("logout", help="保存済みの認証情報を削除")
+    update_parser = subcommands.add_parser("update", help="CLIを最新のGitHub Releaseに更新")
+    update_parser.add_argument("--check", action="store_true", help="更新の有無だけ確認")
     model_parser = subcommands.add_parser("model", help="利用可能なモデルを選択")
     model_parser.add_argument("slug", nargs="?", help="対話操作せずモデル名で選択")
     model_parser.add_argument("--list", action="store_true", help="モデル一覧を表示")
@@ -152,6 +155,13 @@ def main() -> None:
                 print(line)
         except (LoginError, OSError) as error:
             parser.exit(1, f"認証状態を確認できませんでした: {error}\n")
+    elif args.command == "update":
+        try:
+            print(update(check=args.check))
+        except KeyboardInterrupt:
+            parser.exit(130, "\n更新を中断しました。\n")
+        except UpdateError as error:
+            parser.exit(1, f"更新に失敗しました: {error}\n")
     elif args.command == "login":
         try:
             method = args.method or _login_method()

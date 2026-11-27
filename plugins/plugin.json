@@ -1,7 +1,7 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "paper-shift",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Translate extractable English text in research PDFs into Japanese while retaining page geometry and references.",
   "author": { "name": "PaperShift" },
   "repository": "https://github.com/med-000/paper-shift",

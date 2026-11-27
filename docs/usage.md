@@ -17,9 +17,16 @@
 
 ## Agent Skill / ChatGPT Plugin
 
-- [Agent Skill](../skills/paper-shift/SKILL.md)はClaude Code / Codexのモデルが翻訳します。初回は[v0.3.0のPlugin ZIP](https://github.com/med-000/paper-shift/releases/tag/v0.3.0)をダウンロード・ハッシュ検証し、同梱のPDF処理と日本語フォントを使います。Python 3.11以降とPyMuPDFが必要です。
-- [ChatGPT用Plugin ZIP](https://github.com/med-000/paper-shift/releases/download/v0.3.0/paper-shift-plugin.zip)はChatGPTに登録して利用します。ChatGPT本体が訳文を作るため、CLIのログインや開発者の翻訳用APIキーは使いません。ZIPの配布とPlugin公開ディレクトリへの掲載は別です。
+- [Agent Skill](../skills/paper-shift/SKILL.md)はClaude Code / Codexのモデルが翻訳します。初回は[v0.3.1のPlugin ZIP](https://github.com/med-000/paper-shift/releases/tag/v0.3.1)をダウンロード・ハッシュ検証し、同梱のPDF処理と日本語フォントを使います。Python 3.11以降とPyMuPDFが必要です。
+- [ChatGPT用Plugin ZIP](https://github.com/med-000/paper-shift/releases/download/v0.3.1/paper-shift-plugin.zip)はChatGPTに登録して利用します。ChatGPT本体が訳文を作るため、CLIのログインや開発者の翻訳用APIキーは使いません。ZIPの配布とPlugin公開ディレクトリへの掲載は別です。
 - どちらもPDFから原文を抽出し、ID付きの訳文を検証して再構築します。長い論文では全翻訳バッチの完了が必要です。
+
+## 更新方法
+
+- **配布版CLI**：v0.3.1以降は`pshift update --check`で最新版を確認し、`pshift update`で更新できます。macOS arm64 / Linux x86_64の標準インストール先（`~/.local/bin/pshift`）が対象です。GitHub Releaseのチェックサムと実行ファイルのバージョンを検証してから置き換えます。**v0.3.0の実行ファイルにはまだupdateコマンドがないため、最初の更新はREADMEのインストールコマンドを再実行してください。**
+- **ソース版CLI**：リポジトリで`git pull`してから`uv sync`を実行します。`pshift update`はソース版を書き換えません。
+- **Agent Skill**：`npx skills update paper-shift -g`でインストール済みSkillを更新します。Skillはv0.3.1のPlugin ZIPを指定しているため、Skill側の参照先が新しいリリースに更新されるまでPDFエンジンは変わりません。
+- **ChatGPTのローカルPlugin**：新しいリリースのPlugin ZIPを入手し、ChatGPTのPlugin詳細で**Upload new version**があればアップロードします。ワークスペース管理者によるアップロードの場合は、そのワークスペースの管理画面から更新してください。GitHub Releaseの公開だけでは登録済みPluginは更新されません。
 
 ## PDFの仕上がり
 

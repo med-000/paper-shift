@@ -9,11 +9,11 @@ Use your own model for translation. Do not run `pshift login`, call a translatio
 
 ## Get the PDF engine
 
-Use an existing, trusted `paper-shift-plugin.zip` from PaperShift v0.3.0 if the user has already supplied one. Otherwise download the asset from:
+Use an existing, trusted `paper-shift-plugin.zip` from PaperShift v0.3.1 if the user has already supplied one. Otherwise download the asset from:
 
-`https://github.com/med-000/paper-shift/releases/download/v0.3.0/paper-shift-plugin.zip`
+`https://github.com/med-000/paper-shift/releases/download/v0.3.1/paper-shift-plugin.zip`
 
-Verify the ZIP's SHA-256 is `c82d71e85ddb11779b9c2d0bc8a7e451520155e96ef29ed76303a1517ad881cb` before extracting. Unzip into a new temporary working directory. The script is at `paper-shift/scripts/pdf_bridge.py` in the extracted directory; it reads `paper-shift/vendor/src/pdf.py` and the bundled fonts. If the archive cannot be downloaded or the checksum differs, stop and report the problem. Never execute an unverified replacement.
+Verify the ZIP's SHA-256 is `cd94200f102c6018f7fd4619b5efc77590af33336dc3c85beb9c772c28023572` before extracting. Unzip into a new temporary working directory. The script is at `paper-shift/scripts/pdf_bridge.py` in the extracted directory; it reads `paper-shift/vendor/src/pdf.py` and the bundled fonts. If the archive cannot be downloaded or the checksum differs, stop and report the problem. Never execute an unverified replacement.
 
 If PyMuPDF is unavailable, install the dependencies from `requirements.txt` next to this SKILL.md into an isolated Python environment (for example, `python -m pip install -r <skill-dir>/requirements.txt`). Use the same Python environment when running the bridge. Do not install the published `paper-shift` package from PyPI: this skill uses the verified release ZIP and the agent's own translations instead of the CLI's sign-in and inference path.
 
