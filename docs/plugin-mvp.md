@@ -8,7 +8,7 @@ CLIは引き続き`uv run pshift`で使用できる。Pluginは別の認証フ�
 uv run python scripts/package-plugin.py
 ```
 
-`dist/paper-shift-plugin.zip`に、portable `plugin.json`、`skills/translate-paper/SKILL.md`、`scripts/pdf_bridge.py`、CLIの`src/pdf.py`と同梱フォントをまとめる。Pluginを再ビルドすれば`src/pdf.py`とフォントの最新版を取り込む。GitHub ReleaseへのZIP添付は、公開Pluginディレクトリへの申請とは別。
+Pluginのソースは`plugins/plugin.json`、`plugins/skills/translate-paper/SKILL.md`、`plugins/scripts/pdf_bridge.py`に置く。`dist/paper-shift-plugin.zip`にはこれらとCLIの`src/pdf.py`・同梱フォントを`paper-shift/`ディレクトリにまとめる。Pluginを再ビルドすれば`src/pdf.py`とフォントの最新版を取り込む。GitHub ReleaseへのZIP添付は、公開Pluginディレクトリへの申請とは別。
 
 スキルの処理手順:
 
