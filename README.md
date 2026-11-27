@@ -11,7 +11,7 @@
 
 ## インストール
 
-- **Agent Skill（Claude Code / Codex）**：Python 3.11以降とPyMuPDFが必要です。Claude Codeでは`/paper-shift`、Codexでは`$paper-shift`で呼び出します。
+- **Agent Skill（Claude Code / Codex）**：Python 3.11以降が必要です。PDF処理の依存関係は[`requirements.txt`](skills/paper-shift/requirements.txt)に記載しています。Claude Codeでは`/paper-shift`、Codexでは`$paper-shift`で呼び出します。
 
   ```sh
   npx skills add med-000/paper-shift --skill paper-shift -g -a claude-code -a codex

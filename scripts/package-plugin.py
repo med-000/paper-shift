@@ -9,6 +9,7 @@ PLUGIN = ROOT / "plugins"
 OUTPUT = ROOT / "dist" / "paper-shift-plugin.zip"
 FILES = {
     "plugin.json": PLUGIN / "plugin.json",
+    "requirements.txt": PLUGIN / "requirements.txt",
     "assets/icon.svg": PLUGIN / "assets/icon.svg",
     "LICENSE": ROOT / "LICENSE",
     "skills/translate-paper/SKILL.md": PLUGIN / "skills/translate-paper/SKILL.md",
