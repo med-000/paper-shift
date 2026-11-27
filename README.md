@@ -66,6 +66,20 @@ headless端末では、ブラウザがある端末で認証した後、保護し
 
 [v0.3.0 Release](https://github.com/med-000/paper-shift/releases/tag/v0.3.0)の`paper-shift-plugin.zip`にはSkills-only PluginとPDF処理・日本語フォントが含まれます。ChatGPT本体が訳文を生成するため、開発者側の翻訳用APIキーは不要です。利用できる環境でZIPを登録し、英語論文PDFを添付してPaperShiftに日本語PDFの作成を依頼してください。Web版ChatGPTでのZIP登録・動作を確認済みです。公開Pluginディレクトリへの申請・掲載は別途必要です。詳細は[Plugin MVP](docs/plugin-mvp.md)を参照してください。
 
+## Claude Code / Codex向けAgent Skill
+
+他のリポジトリで使うエージェント向けに、[`skills/paper-shift/SKILL.md`](skills/paper-shift/SKILL.md)を提供しています。Skillはエージェント自身に翻訳させ、PDFの抽出・再構築にはv0.3.0の検証済みPlugin ZIPを使用します。Python 3.11以降とPyMuPDFが必要です。APIキーやCLIのログインは使いません。
+
+リポジトリを取得した後、`skills/paper-shift`フォルダをClaude Codeなら`~/.claude/skills/paper-shift`、Codexなら`~/.agents/skills/paper-shift`へコピーしてください。例えばCodexなら次のとおりです（Claude Codeならコピー先を`~/.claude/skills/`に変更）。
+
+```sh
+git clone --depth 1 https://github.com/med-000/paper-shift.git
+mkdir -p ~/.agents/skills
+cp -R paper-shift/skills/paper-shift ~/.agents/skills/
+```
+
+起動中にSkillが表示されなければ再起動します。Claude Codeでは`/paper-shift`、Codexでは`$paper-shift`で呼び出し、英語論文PDFのパスと出力先を指定します。初回実行時にはGitHub ReleaseからPDF処理用ZIPを取得・SHA-256で検証するため、ネットワーク接続が必要です。
+
 ## 仕組みと現在の範囲
 
 1. PyMuPDFでPDFの英文ブロックと座標・文字サイズ・太さを取得する。
