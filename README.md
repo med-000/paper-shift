@@ -7,7 +7,7 @@
 
 - **Agent Skill**：Claude Code / Codex自身が翻訳。[Skill](skills/paper-shift/SKILL.md)をインストールして使います。CLIのログインは不要です。
 - **CLI**：`pshift`をインストールし、ChatGPTアカウントでログインして使います。
-- **ローカルPlugin**：[Plugin ZIP](https://github.com/med-000/paper-shift/releases/download/v0.3.0/paper-shift-plugin.zip)をChatGPTに登録して使います。Web版で動作確認済み。[詳細](docs/plugin-mvp.md)
+- **ローカルPlugin**：[Plugin ZIP](https://github.com/med-000/paper-shift/releases/download/v0.3.0/paper-shift-plugin.zip)をChatGPTに登録して使います。Web版で動作確認済み。[詳しい使い方](docs/usage.md)
 
 ## インストール
 
@@ -58,4 +58,4 @@ API key方式（`--method api-key`）はChatGPTプランとは別の従量課金
   uv run python -m unittest discover -s tests -q
   ```
 
-[仕様と制限](docs/feasibility.md) · [配布の詳細](docs/distribution.md) · [ライセンス](LICENSE)（フォントは[OFL](src/fonts/README.md)）
+[詳しい使い方と制限](docs/usage.md) · [トラブルシューティング](docs/troubleshooting.md) · [ライセンス](docs/licenses.md)

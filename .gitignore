@@ -49,3 +49,11 @@ Desktop.ini
 
 # Private local release checklist (never commit)
 /docs/relese.md
+
+# Superseded planning and development notes
+/docs/distribution.md
+/docs/feasibility.md
+/docs/overview.md
+/docs/plugin-mvp.md
+/docs/plugin-phase0.md
+/docs/roadmap.md
