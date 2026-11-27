@@ -2,10 +2,10 @@
 
 **英語論文PDFを、日本語で読めるPDFに。** 元PDFのページ数・図・画像・線画をできるだけ保ちながら、抽出した英文を翻訳して同じページの近い位置に配置するオープンソースのCLIです。生成された日本語は画像ではなく、選択・検索できるPDFテキストです。
 
-> **v0.2.2:** macOS Apple Silicon（arm64）・Linux x86_64向けに配布。Windows・Intel Mac用の実行ファイルはまだありません。テキストを抽出できるPDFが対象で、スキャンPDFのOCRには未対応です。
+> **v0.3.0:** macOS Apple Silicon（arm64）・Linux x86_64向けCLIとChatGPT用Plugin ZIPを配布。Windows・Intel Mac用の実行ファイルはまだありません。テキストを抽出できるPDFが対象で、スキャンPDFのOCRには未対応です。
 
 - [macOS](#macosapple-siliconで使う) · [Linux](#linux-x86_64で使う)
-- [ソースからの実行](#ソースから使う)
+- [ソースからの実行](#ソースから使う) · [ChatGPT Plugin](#chatgpt-plugin)
 - [仕組み・制限](#仕組みと現在の範囲)
 
 ## macOS（Apple Silicon）で使う
@@ -53,7 +53,7 @@ pshift pdf paper.pdf -o paper-ja.pdf
 
 ## ソースから使う
 
-macOS・Linuxでは、Python 3.11以降と[uv](https://docs.astral.sh/uv/getting-started/installation/)を用意して、リポジトリのルートから実行できます。Windowsはソース版の検証段階で、v0.2.2の配布対象ではありません。
+macOS・Linuxでは、Python 3.11以降と[uv](https://docs.astral.sh/uv/getting-started/installation/)を用意して、リポジトリのルートから実行できます。Windowsはソース版の検証段階で、v0.3.0の配布対象ではありません。
 
 ```sh
 uv run pshift login
@@ -61,6 +61,10 @@ uv run pshift pdf paper.pdf -o paper-ja.pdf
 ```
 
 headless端末では、ブラウザがある端末で認証した後、保護した認証ファイルを転送して`pshift login --method headless --from-file <ファイル>`で取り込みます。`pshift login --method api-key`も選べますが、**API keyはChatGPTプランとは別のOpenAI Platform従量課金**です。自動でAPI key方式へ切り替えることはありません。
+
+## ChatGPT Plugin
+
+[v0.3.0 Release](https://github.com/med-000/paper-shift/releases/tag/v0.3.0)の`paper-shift-plugin.zip`にはSkills-only PluginとPDF処理・日本語フォントが含まれます。ChatGPT本体が訳文を生成するため、開発者側の翻訳用APIキーは不要です。利用できる環境でZIPを登録し、英語論文PDFを添付してPaperShiftに日本語PDFの作成を依頼してください。Web版ChatGPTでのZIP登録・動作を確認済みです。公開Pluginディレクトリへの申請・掲載は別途必要です。詳細は[Plugin MVP](docs/plugin-mvp.md)を参照してください。
 
 ## 仕組みと現在の範囲
 
@@ -75,6 +79,6 @@ headless端末では、ブラウザがある端末で認証した後、保護し
 ## 開発・ライセンス
 
 - [技術方針](docs/overview.md) · [検証事項と制限](docs/feasibility.md) · [ロードマップ](docs/roadmap.md) · [ビルド・配布](docs/distribution.md)
-- `plugin`ブランチで開発中の[ChatGPT Skills-only Plugin MVP](docs/plugin-mvp.md)は、ローカルのZIP生成・PDF再構築まで検証済みです。ChatGPT上での動作と一般公開は未検証です。
+- [ChatGPT Skills-only Plugin](docs/plugin-mvp.md)はWeb版ChatGPTへのZIP登録・使用を確認済みです。公開ディレクトリへの申請・掲載は未実施です。
 - ソースコード: [GNU AGPLv3](LICENSE)。同梱のNotoフォントにはそれぞれの[SIL Open Font License](src/fonts/README.md)が適用されます。
 - v0.1.0はCLIの起動確認用の旧リリースです。PDF翻訳はv0.2.0以降を使用してください。

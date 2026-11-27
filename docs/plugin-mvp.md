@@ -1,6 +1,6 @@
 # Skills-only Plugin MVP
 
-`plugin`ブランチで開発中。CLIは引き続き`uv run pshift`で使用できる。Pluginは別の認証フローや開発者用AI APIキーを使わず、ChatGPT本体が翻訳した文字列を受け取り、既存のPDF処理コードで日本語PDFを生成する。
+CLIは引き続き`uv run pshift`で使用できる。Pluginは別の認証フローや開発者用AI APIキーを使わず、ChatGPT本体が翻訳した文字列を受け取り、既存のPDF処理コードで日本語PDFを生成する。Web版ChatGPTへのZIP登録と使用は利用者が確認済み。公開ディレクトリへの提出・審査はまだ行っていない。
 
 ## パッケージと操作
 
@@ -8,7 +8,7 @@
 uv run python scripts/package-plugin.py
 ```
 
-`dist/paper-shift-plugin.zip`に、portable `plugin.json`、`skills/translate-paper/SKILL.md`、`scripts/pdf_bridge.py`、CLIの`src/pdf.py`と同梱フォントをまとめる。アーカイブはアップロード用の**候補**であり、ChatGPT Pluginポータルでのアップロード・審査・公開は未実施。Pluginを再ビルドすれば`src/pdf.py`とフォントの最新版を取り込む。
+`dist/paper-shift-plugin.zip`に、portable `plugin.json`、`skills/translate-paper/SKILL.md`、`scripts/pdf_bridge.py`、CLIの`src/pdf.py`と同梱フォントをまとめる。Pluginを再ビルドすれば`src/pdf.py`とフォントの最新版を取り込む。GitHub ReleaseへのZIP添付は、公開Pluginディレクトリへの申請とは別。
 
 スキルの処理手順:
 
@@ -23,10 +23,10 @@ uv run python scripts/package-plugin.py
 - `uv run python -m unittest discover -s tests -q`：33件成功。ZIPを展開した状態で2ページのPDFを抽出・訳文注入・再構築し、同じ英文が2ページにある場合の訳文の対応、欠落した訳文・変更された原本の拒否を確認した。
 - 既存の11ページ実論文をZIP内のスクリプトで抽出：24バッチ、参考文献の原文は翻訳依頼に含まれず、最後の翻訳対象は10ページ目。
 
-## 未検証の公開ゲート
+## 公開ディレクトリでの未検証事項
 
-- ChatGPT Work上でSkills-only Pluginをインストールし、同梱Pythonスクリプト・PyMuPDF・フォントを実行できること。Cloud/Localの実行環境と、Plus/Proを含む対象プランを区別する。
-- PDF添付をスクリプトから参照し、ChatGPT本体が24バッチを欠落なく訳し、生成PDFをダウンロードできること。長文・途中停止・再開も確認する。
+- 対象プランや他の利用者の環境でも同梱Pythonスクリプト・PyMuPDF・フォントを実行できること。
+- 11ページ論文の24バッチを欠落なく訳し、生成PDFをダウンロードできること。長文・途中停止・再開も確認する。
 - ZIPのメタデータ・アイコン・サポート/プライバシー情報の審査要件を満たし、開発者の本人確認後に一般公開できること。現段階では申請・公開しない。
 
 ChatGPT環境の検証でSkills-onlyが必要な機能を満たせない場合にのみRemote MCPを検討する。ローカル実行限定なら`requires_local_executor`でDesktop onlyとして公開可能だが、Web/モバイルに提供する要件を満たすか先に判断する。

@@ -2,7 +2,7 @@
 
 ## 現在の構成
 
-ソース版ではChatGPTプランでの短文翻訳と、実論文の日本語PDF保存を確認済みです。v0.2.2はmacOS arm64・Linux x86_64向けに認証・モデル選択・PDF翻訳を配布します。Windows・Intel Macは対象外です。`ps`はmacOSの標準コマンドと衝突するため使いません。
+ソース版ではChatGPTプランでの短文翻訳と、実論文の日本語PDF保存を確認済みです。v0.3.0はmacOS arm64・Linux x86_64向けに認証・モデル選択・PDF翻訳を配布し、ChatGPT用のSkills-only Plugin ZIPも添付します。Windows・Intel Macは対象外です。`ps`はmacOSの標準コマンドと衝突するため使いません。
 
 ```text
 paper-shift/
@@ -88,9 +88,13 @@ curl -fsSL https://raw.githubusercontent.com/med-000/paper-shift/main/scripts/in
 
 Linux x86_64環境で`binutils`とuvを用意して`sh scripts/build-linux.sh`を実行し、`pshift-linux-x86_64.tar.gz`を作成します。v0.2.2はDebian 12（glibc 2.36）コンテナでビルド・起動・インストール・削除を確認済みです。展開先で`sh install-linux.sh`、または`curl -fsSL https://raw.githubusercontent.com/med-000/paper-shift/main/scripts/install-online-linux.sh | sh`でインストールできます。`~/.local/bin`に配置し、`~/.profile`にPATHを追加します。削除は`sh "$HOME/.local/share/papershift/uninstall-linux.sh"`です。古いglibcの環境や別アーキテクチャは対象外です。
 
+## ChatGPT Plugin
+
+`uv run python scripts/package-plugin.py`で`dist/paper-shift-plugin.zip`を生成します。ZIPにはPDF処理コード・フォントとそのライセンスを同梱します。GitHub ReleaseからダウンロードしてChatGPTのPlugin ZIP登録に使用できます。公開Pluginディレクトリへの掲載はGitHub Releaseとは別の申請・審査が必要です。
+
 ## Windows（配布対象外）
 
-既存の`scripts/build-windows.ps1`などは技術検証用として残します。v0.2.2にはWindows用のアーカイブを添付せず、インストールURLも提供しません。
+既存の`scripts/build-windows.ps1`などは技術検証用として残します。v0.3.0にはWindows用のアーカイブを添付せず、インストールURLも提供しません。
 
 ## 配布の完成条件
 
