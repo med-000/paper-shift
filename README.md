@@ -75,5 +75,6 @@ headless端末では、ブラウザがある端末で認証した後、保護し
 ## 開発・ライセンス
 
 - [技術方針](docs/overview.md) · [検証事項と制限](docs/feasibility.md) · [ロードマップ](docs/roadmap.md) · [ビルド・配布](docs/distribution.md)
+- `plugin`ブランチで開発中の[ChatGPT Skills-only Plugin MVP](docs/plugin-mvp.md)は、ローカルのZIP生成・PDF再構築まで検証済みです。ChatGPT上での動作と一般公開は未検証です。
 - ソースコード: [GNU AGPLv3](LICENSE)。同梱のNotoフォントにはそれぞれの[SIL Open Font License](src/fonts/README.md)が適用されます。
 - v0.1.0はCLIの起動確認用の旧リリースです。PDF翻訳はv0.2.0以降を使用してください。

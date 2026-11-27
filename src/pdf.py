@@ -105,6 +105,33 @@ def _citation_block(text: str) -> bool:
     return bool(re.match(r"\s*\d{1,3}\.\s*(?:\n|[A-Z])", text))
 
 
+def _page_blocks(page: pymupdf.Page, in_references: bool) -> tuple[list[TextBlock], bool]:
+    reference_start = None if in_references else _reference_start(page)
+    blocks = [] if in_references else _text_blocks(page)
+    if reference_start is not None:
+        blocks = [block for block in blocks if block.rect.y0 < reference_start
+                  and not _citation_block(block.text)]
+        in_references = True
+    return blocks, in_references
+
+
+def _batches(blocks: list[TextBlock]) -> list[list[str]]:
+    fragments = [fragment for block in blocks for fragment in _chunks(block.text)]
+    batches = []
+    current = []
+    length = 0
+    for fragment in fragments:
+        if current and length + len(fragment) > 3000:
+            batches.append(current)
+            current = []
+            length = 0
+        current.append(fragment)
+        length += len(fragment)
+    if current:
+        batches.append(current)
+    return batches
+
+
 def _register_fonts(page: pymupdf.Page) -> None:
     for name, path in FONTS.items():
         if not path.is_file():
@@ -219,14 +246,17 @@ def _choose_layout(page: pymupdf.Page, blocks: list[TextBlock], translations: li
 
 
 def translate_pdf(
-    source: Path, destination: Path, translate_texts: Callable[[list[str]], list[str]], *, force: bool = False,
+    source: Path, destination: Path, translate_texts: Callable[[list[str]], list[str]] | None = None, *, force: bool = False,
     progress: Callable[[int, int], None] | None = None,
+    translate_batch: Callable[[int, int, list[str]], list[str]] | None = None,
 ) -> tuple[int, int]:
     """Save a translated copy only after every translated block fits on its original page."""
     source = source.expanduser().resolve()
     destination = destination.expanduser().resolve()
     if not source.is_file():
         raise PdfError(f"入力PDFが見つかりません: {source}")
+    if translate_texts is None and translate_batch is None:
+        raise PdfError("翻訳処理が指定されていません。")
     if source == destination:
         raise PdfError("入力PDFと出力先を同じファイルにできません。")
     if destination.exists() and not force:
@@ -248,28 +278,21 @@ def translate_pdf(
         with ThreadPoolExecutor(max_workers=3) as executor:
             prepared = []
             for number, page in enumerate(document, start=1):
-                reference_start = None if in_references else _reference_start(page)
-                blocks = [] if in_references else _text_blocks(page)
-                if reference_start is not None:
-                    blocks = [block for block in blocks if block.rect.y0 < reference_start
-                              and not _citation_block(block.text)]
-                    in_references = True
+                blocks, in_references = _page_blocks(page, in_references)
                 if not blocks:
                     prepared.append((number, blocks, [], []))
                     continue
                 fragments = [(index, fragment) for index, block in enumerate(blocks) for fragment in _chunks(block.text)]
                 pending = []
                 processed = 0
-                while processed < len(fragments):
-                    batch = []
-                    length = 0
-                    for index, fragment in fragments[processed:]:
-                        if batch and length + len(fragment) > 3000:
-                            break
-                        batch.append((index, fragment))
-                        length += len(fragment)
-                    pending.append((batch, executor.submit(translate_texts, [text for _, text in batch])))
-                    processed += len(batch)
+                for batch_number, texts in enumerate(_batches(blocks), start=1):
+                    batch = fragments[processed:processed + len(texts)]
+                    if translate_batch is None:
+                        assert translate_texts is not None
+                    future = (executor.submit(translate_batch, number, batch_number, texts)
+                              if translate_batch is not None else executor.submit(translate_texts, texts))
+                    pending.append((batch, future))
+                    processed += len(texts)
                 raw_blocks = [block for block in page.get_text("blocks") if block[6] == 0]
                 prepared.append((number, blocks, raw_blocks, pending))
 

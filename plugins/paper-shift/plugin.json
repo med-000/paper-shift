@@ -1,0 +1,26 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "paper-shift",
+  "version": "0.1.0",
+  "description": "Translate extractable English text in research PDFs into Japanese while retaining page geometry and references.",
+  "author": { "name": "PaperShift" },
+  "repository": "https://github.com/med-000/paper-shift",
+  "license": "AGPL-3.0-only",
+  "extensions": {
+    "com.openai": {
+      "interface": {
+        "displayName": "PaperShift",
+        "shortDescription": "Research PDFs in Japanese",
+        "longDescription": "Translate extractable English text in research PDFs into Japanese while keeping page geometry, images, and references where possible. Requires a Python execution environment with PyMuPDF; scanned PDFs are not supported.",
+        "developerName": "PaperShift",
+        "category": "Education & Research",
+        "capabilities": ["Translate PDF text", "Preserve PDF page layout"],
+        "websiteURL": "https://github.com/med-000/paper-shift",
+        "supportURL": "https://github.com/med-000/paper-shift/issues",
+        "defaultPrompt": ["Translate my attached English research paper PDF into Japanese and give me the PDF."],
+        "composerIcon": "./assets/icon.svg",
+        "logo": "./assets/icon.svg"
+      }
+    }
+  }
+}
